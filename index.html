@@ -2,25 +2,22 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Live TV Board</title>
+    <title>Smart TV Board</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; height: 100vh; display: flex; justify-content: center; align-items: center; }
-        #display { width: 100%; height: 100%; }
-        .slide { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; }
+        #display { width: 100%; height: 100%; position: relative; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: #000; }
+        .active { display: flex; }
         iframe { width: 100%; height: 100%; border: none; }
-        .text { font-size: 4rem; font-weight: bold; padding: 40px; white-space: pre-wrap; text-shadow: 3px 3px 10px #000; }
-        #clock { position: absolute; top: 15px; right: 25px; font-size: 2rem; background: rgba(0,0,0,0.6); padding: 5px 15px; border-radius: 10px; z-index: 100; }
-        .timer-grid { display: flex; gap: 15px; }
-        .unit { background: #1a1a1a; padding: 15px; border-radius: 10px; min-width: 100px; border: 1px solid #333; }
-        .val { font-size: 4rem; display: block; color: #fff; }
-        .lab { font-size: 1.2rem; color: #ffd700; text-transform: uppercase; }
+        .text-content { padding: 50px; font-size: 4.5rem; font-weight: 800; line-height: 1.2; text-shadow: 0 5px 20px rgba(0,0,0,0.8); z-index: 10; }
+        #clock { position: absolute; top: 20px; right: 30px; font-size: 2.5rem; background: rgba(0,0,0,0.7); padding: 10px 25px; border-radius: 15px; z-index: 100; font-weight: bold; border: 1px solid #333; }
     </style>
 </head>
 <body>
     <div id="clock">00:00</div>
-    <div id="display"><h1>Завантаження системи...</h1></div>
+    <div id="display"></div>
 
 <script>
     const firebaseConfig = {
@@ -35,49 +32,57 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('slides');
 
-    let slides = [];
+    let slidesData = [];
     let currentIndex = 0;
+    let mainTimer;
 
+    // Слідкуємо за базою даних
     db.on('value', (snap) => {
-        slides = [];
-        snap.forEach(c => slides.push(c.val()));
-        if (slides.length > 0) show();
-        else document.getElementById('display').innerHTML = "<h1>Екран готовий. Додайте слайди в адмінці!</h1>";
+        const data = [];
+        snap.forEach(child => { data.push(child.val()); });
+        slidesData = data;
+        if (slidesData.length > 0 && !mainTimer) {
+            startDisplay();
+        }
     });
 
-    function show() {
+    function startDisplay() {
+        if (slidesData.length === 0) {
+            document.getElementById('display').innerHTML = "<h1>Очікування слайдів...</h1>";
+            return;
+        }
+
         const container = document.getElementById('display');
-        container.innerHTML = '';
-        const data = slides[currentIndex];
-        const s = document.createElement('div');
-        s.className = 'slide';
+        const currentSlide = slidesData[currentIndex];
+        
+        container.innerHTML = ''; // Очищуємо
+        const slideDiv = document.createElement('div');
+        slideDiv.className = 'slide active';
 
-        if (data.type === 'карта') {
-            s.innerHTML = `<iframe src="${data.body}"></iframe>`;
-        } else if (data.type === 'хронометр') {
-            s.innerHTML = `<div class="timer-grid" id="tmr"></div>`;
-            updateTimer();
+        let displayTime = 15000; // Стандарт: 15 сек
+
+        if (currentSlide.type === 'карта') {
+            slideDiv.innerHTML = `<iframe src="${currentSlide.body}"></iframe>`;
+            displayTime = 60000; // Карта на 1 хвилину
         } else {
-            if(data.bg) s.style.background = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg}) center/cover`;
-            s.innerHTML = `<div class="text">${data.body}</div>`;
+            if (currentSlide.bg) {
+                slideDiv.style.background = `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('${currentSlide.bg}') center/cover`;
+            }
+            slideDiv.innerHTML = `<div class="text-content">${currentSlide.body}</div>`;
         }
-        container.appendChild(s);
-        setTimeout(() => { currentIndex = (currentIndex + 1) % slides.length; show(); }, 20000);
+
+        container.appendChild(slideDiv);
+
+        // Плануємо наступний слайд
+        currentIndex = (currentIndex + 1) % slidesData.length;
+        mainTimer = setTimeout(startDisplay, displayTime);
     }
 
-    function updateTimer() {
-        const diff = new Date() - new Date('2022-02-24T05:00:00');
-        const d = Math.floor(diff/86400000), h = Math.floor((diff/3600000)%24), m = Math.floor((diff/60000)%60), s = Math.floor((diff/1000)%60);
-        const t = document.getElementById('tmr');
-        if(t) {
-            t.innerHTML = `<div class="unit"><span class="val">${d}</span><span class="lab">Днів</span></div>` +
-                          `<div class="unit"><span class="val">${h}</span><span class="lab">Год</span></div>` +
-                          `<div class="unit"><span class="val">${m}</span><span class="lab">Хв</span></div>` +
-                          `<div class="unit"><span class="val">${s}</span><span class="lab">Сек</span></div>`;
-            setTimeout(updateTimer, 1000);
-        }
-    }
-    setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'}); }, 1000);
+    // Годинник
+    setInterval(() => {
+        const now = new Date();
+        document.getElementById('clock').innerText = now.toLocaleTimeString('uk-UA', {hour: '2-digit', minute: '2-digit'});
+    }, 1000);
 </script>
 </body>
 </html>
