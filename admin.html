@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Адмінка ТБ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; padding: 15px; color: #1c1e21; }
+        .card { max-width: 450px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #007bff; margin-top: 0; }
+        select, textarea, input, button { width: 100%; margin-bottom: 12px; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
+        button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #0056b3; }
+        .item { background: #f8f9fa; padding: 10px; margin-top: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #007bff; }
+        .del { background: #ff4444; width: auto; padding: 5px 12px; margin: 0; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>📱 Пульт Табло</h2>
+    <label>Тип контенту:</label>
+    <select id="t">
+        <option value="новини">Новини / Текст</option>
+        <option value="карта">Карта тривог</option>
+        <option value="хронометр">Хронометр війни</option>
+        <option value="вітання">Вітання</option>
+    </select>
+    <textarea id="b" rows="3" placeholder="Текст або посилання..."></textarea>
+    <input id="bg" placeholder="Фонова картинка (назва)">
+    <button onclick="add()">ОПУБЛІКУВАТИ</button>
+    <div id="l">Завантаження...</div>
+</div>
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDI5emOGELK-Ac4lCn_7nIoT-okhEQgVfY",
+        authDomain: "myboard-42e97.firebaseapp.com",
+        databaseURL: "https://myboard-42e97-default-rtdb.firebaseio.com",
+        projectId: "myboard-42e97",
+        storageBucket: "myboard-42e97.firebasestorage.app",
+        messagingSenderId: "819814141254",
+        appId: "1:819814141254:web:abcfad133a915762ae6947"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database().ref('slides');
+
+    function add() {
+        const type = document.getElementById('t').value;
+        const body = document.getElementById('b').value;
+        const bg = document.getElementById('bg').value;
+        if (!body && type !== 'хронометр') return alert("Поле пусте!");
+        db.push({ type, body, bg });
+        document.getElementById('b').value = '';
+    }
+
+    db.on('value', (snap) => {
+        const l = document.getElementById('l');
+        l.innerHTML = '<h3>Черга на екрані:</h3>';
+        snap.forEach(c => {
+            const s = c.val();
+            l.innerHTML += `<div class="item">
+                <span><b>${s.type.toUpperCase()}</b></span>
+                <button class="del" onclick="del('${c.key}')">Видалити</button>
+            </div>`;
+        });
+        if (l.innerHTML === '<h3>Черга на екрані:</h3>') l.innerHTML += '<p>Черга порожня</p>';
+    });
+
+    function del(id) { db.child(id).remove(); }
+</script>
+</body>
+</html>
