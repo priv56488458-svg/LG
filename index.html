@@ -2,18 +2,18 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>TV Board Pro Adaptive</title>
+    <title>TV Board Professional</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-<style>
+    <style>
         body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; }
         #display { width: 100%; height: 100%; }
         .slide { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
         iframe { width: 100%; height: 100%; border: none; background: white; }
         
-        /* НОВИЙ ЗМЕНШЕНИЙ ШРИФТ */
+        /* Адаптивний шрифт */
         .text { 
-            font-size: 2.2vw; /* Було 3.5vw, тепер значно менше */
+            font-size: 2.8vw; 
             font-weight: 600; 
             padding: 40px 100px; 
             line-height: 1.4;
@@ -52,52 +52,74 @@
     let index = 0;
     let timer = null;
 
-   let slides = [];
-    let index = 0;
-    let timer = null;
-
+    // Слухаємо базу даних
     db.on('value', (snap) => {
-        slides = [];
+        const newSlides = [];
         snap.forEach(c => { 
             const s = c.val();
-            if (!s.paused) slides.push(s); // Показуємо тільки НЕ на паузі
+            if (!s.paused) newSlides.push({ ...s, id: c.key }); 
         });
-        slides.sort((a, b) => (a.order || 0) - (b.order || 0));
-        if(!timer) show();
+        
+        // Сортування за чергою, яку ти виставив в адмінці
+        newSlides.sort((a, b) => (a.order || 0) - (b.order || 0));
+        
+        slides = newSlides;
+        
+        // Якщо це перше завантаження або черга була порожня - запускаємо
+        if (!timer) show();
     });
 
     function show() {
+        clearTimeout(timer);
+        const container = document.getElementById('display');
+        
+        // 1. Перевірка на Хвилину мовчання
         const now = new Date();
-        const currentTime = now.getHours() + ":" + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+        const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
 
-        // АВТОМАТИЧНА ХВИЛИНА МОВЧАННЯ (09:00 - 09:01)
         if (currentTime === "09:00") {
             displayMourning();
-            setTimeout(show, 30000); // Перевірити знову через 30 сек
+            timer = setTimeout(show, 30000); // Перевірити знову через 30 сек
             return;
         }
 
-        const container = document.getElementById('display');
+        // 2. Якщо слайдів немає
         if (slides.length === 0) {
-            container.innerHTML = "<h1>Очікування...</h1>";
+            container.innerHTML = "<h1>Очікування нових слайдів...</h1>";
+            timer = setTimeout(show, 5000);
             return;
         }
 
+        // 3. Відображення слайда
         const data = slides[index];
         container.innerHTML = '';
         const s = document.createElement('div');
         s.className = 'slide';
 
-        let duration = 15000;
+        let duration = 15000; // Стандарт 15 сек
+
         if (data.type === 'карта') {
             s.innerHTML = `<iframe src="${data.body}"></iframe>`;
-            duration = 60000;
-        } else {
+            duration = 60000; // Карта на 1 хв
+        } 
+        else if (data.type === 'день народження') {
+            s.style.background = "linear-gradient(45deg, #ff00cc, #3333ff)";
+            s.innerHTML = `
+                <div style="font-size: 5vw;">🎉</div>
+                <div class="text" style="color: #fff; text-transform: uppercase;">${data.body}</div>
+                <div style="font-size: 5vw;">🎂</div>
+            `;
+            duration = 20000;
+        } 
+        else {
+            // Звичайні новини
             if (data.bg) s.style.background = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg}) center/cover`;
             s.innerHTML = `<div class="text">${data.body}</div>`;
         }
 
         container.appendChild(s);
+
+        // Перехід до наступного
         index = (index + 1) % slides.length;
         timer = setTimeout(show, duration);
     }
@@ -105,61 +127,18 @@
     function displayMourning() {
         const container = document.getElementById('display');
         container.innerHTML = `
-            <div class="slide" style="background: #000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <div class="slide" style="background: #000; color: white;">
                 <div style="font-size: 10vw;">🕯️</div>
-                <div style="font-size: 5vw; font-weight: bold; text-transform: uppercase; letter-spacing: 5px;">Загальнонаціональна хвилина мовчання</div>
-                <div style="font-size: 2vw; margin-top: 20px;">Вшановуємо пам'ять загиблих героїв та цивільних...</div>
+                <div style="font-size: 4vw; font-weight: bold; text-transform: uppercase; letter-spacing: 5px; padding: 20px;">Загальнонаціональна хвилина мовчання</div>
+                <div style="font-size: 2vw; opacity: 0.8;">Вшановуємо пам'ять героїв</div>
             </div>
         `;
-        clearTimeout(timer);
     }
 
     // Годинник
     setInterval(() => {
-        document.getElementById('clock').innerText = new Date().toLocaleTimeString('uk-UA', {hour:'2-digit', minute:'2-digit'});
-    }, 1000);
-
-   function show() {
-    const container = document.getElementById('display');
-    if (slides.length === 0) {
-        container.innerHTML = "<h1 style='margin-top:20vh'>Черга порожня</h1>";
-        return;
-    }
-
-    const data = slides[index];
-    container.innerHTML = '';
-    const s = document.createElement('div');
-    s.className = 'slide';
-
-    let duration = 15000; 
-
-    if (data.type === 'карта') {
-        s.innerHTML = `<iframe src="${data.body}"></iframe>`;
-        duration = 45000; 
-    } 
-    // НОВИЙ БЛОК ДЛЯ ДНІВ НАРОДЖЕННЯ
-    else if (data.type === 'день народження') {
-        s.style.background = "linear-gradient(45deg, #ff00cc, #3333ff)"; // Яскравий фон
-        s.innerHTML = `
-            <div style="font-size: 5vw;">🎉</div>
-            <div class="text" style="color: #fff; text-transform: uppercase;">${data.body}</div>
-            <div style="font-size: 5vw;">🎂</div>
-        `;
-        duration = 20000; // Показуємо трохи довше
-    } 
-    else {
-        if (data.bg) s.style.background = `linear-gradient(rgba(0,0,0,0.6),rgba(0,0,0,0.6)), url(${data.bg}) center/cover`;
-        s.innerHTML = `<div class="text">${data.body}</div>`;
-    }
-
-    container.appendChild(s);
-    index = (index + 1) % slides.length;
-    timer = setTimeout(show, duration);
-}
-    }
-
-    setInterval(() => {
-        document.getElementById('clock').innerText = new Date().toLocaleTimeString('uk-UA', {hour:'2-digit', minute:'2-digit'});
+        const timeStr = new Date().toLocaleTimeString('uk-UA', {hour:'2-digit', minute:'2-digit'});
+        document.getElementById('clock').innerText = timeStr;
     }, 1000);
 </script>
 </body>
