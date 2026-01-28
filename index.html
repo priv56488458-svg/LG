@@ -5,30 +5,6 @@
     <title>TV Board Pro Adaptive</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    <style>
-        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', Roboto, sans-serif; overflow: hidden; height: 100vh; }
-        #display { width: 100%; height: 100%; }
-        .slide { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
-        iframe { width: 100%; height: 100%; border: none; background: white; }
-        
-        /* Адаптивний текст новин */
-        .text { 
-            font-size: 3.5vw; /* Розмір залежить від ширини екрана */
-            font-weight: 700; 
-            padding: 5% 8%; 
-            line-height: 1.3;
-            max-width: 90%;
-            word-wrap: break-word;
-            text-shadow: 0 4px 15px rgba(0,0,0,0.9);
-            z-index: 10; 
-        }
-
-        #clock { 
-            position: absolute; top: 15px; right: 25px; 
-            font-size: 2.2rem; background: rgba(0,0,0,0.7); 
-            padding: 8px 20px; border-radius: 12px; 
-            z-index: 100; border: 1px solid #444; 
-            font-variant-numeric: tabular-nums;
 <style>
         body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; }
         #display { width: 100%; height: 100%; }
@@ -54,6 +30,21 @@
             z-index: 100; border: 1px solid #444; 
         }
     </style>
+</head>
+<body>
+    <div id="clock">00:00</div>
+    <div id="display"></div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDI5emOGELK-Ac4lCn_7nIoT-okhEQgVfY",
+        authDomain: "myboard-42e97.firebaseapp.com",
+        databaseURL: "https://myboard-42e97-default-rtdb.firebaseio.com",
+        projectId: "myboard-42e97",
+        storageBucket: "myboard-42e97.firebasestorage.app",
+        messagingSenderId: "819814141254",
+        appId: "1:819814141254:web:abcfad133a915762ae6947"
+    };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('slides');
 
