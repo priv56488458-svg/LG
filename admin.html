@@ -2,96 +2,59 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Панель керування ТБ</title>
+    <title>Конструктор Табло</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 1000px; margin: auto; }
-        h1 { text-align: center; color: #1a5276; margin-bottom: 30px; }
-
-        /* Сітка плиток як на макеті */
-        .dashboard {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
+        body { font-family: 'Segoe UI', sans-serif; background: #eaeff2; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; max-width: 1200px; margin: auto; }
+        
+        /* Картка-прев'ю */
+        .card { 
+            background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            position: relative; cursor: grab; border: 2px solid transparent; transition: 0.2s;
+            display: flex; flex-direction: column; height: 200px;
         }
-
-        .tile {
-            background: #1a5276; /* Синій колір з макету */
-            color: white;
-            height: 150px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 1.2rem;
-            transition: transform 0.2s, background 0.2s;
-            text-align: center;
-            padding: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-
-        .tile:hover { transform: translateY(-5px); background: #2471a3; }
-        .tile.active { border: 4px solid #f1c40f; }
-
-        /* Форма редагування */
-        .editor-box {
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-            display: none; /* З'являється при кліку */
-            margin-bottom: 40px;
-        }
-
-        input, textarea, button { width: 100%; padding: 12px; margin-top: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-size: 16px; }
-        button { background: #27ae60; color: white; border: none; cursor: pointer; font-weight: bold; }
-        .btn-cancel { background: #95a5a6; margin-top: 5px; }
-
-        /* Список черги */
-        .queue-item {
-            background: white;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-left: 6px solid #1a5276;
-        }
-        .actions button { width: auto; padding: 5px 15px; margin: 0 0 0 5px; font-size: 14px; }
-        .del { background: #e74c3c; }
-        .edit { background: #f39c12; }
+        .card:active { cursor: grabbing; }
+        .card.paused { border-color: #f1c40f; background: #fff9e6; }
+        .preview-box { flex-grow: 1; overflow: hidden; font-size: 0.9rem; color: #666; background: #f9f9f9; padding: 10px; border-radius: 6px; margin: 10px 0; border: 1px solid #eee; }
+        
+        .type-badge { font-size: 0.7rem; font-weight: bold; text-transform: uppercase; color: #1a5276; }
+        .controls { display: flex; gap: 8px; }
+        button { border: none; border-radius: 6px; padding: 8px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
+        .btn-add { background: #27ae60; color: white; padding: 12px 25px; font-size: 1rem; }
+        .btn-edit { background: #3498db; color: white; }
+        .btn-pause { background: #f1c40f; color: #333; }
+        .btn-del { background: #e74c3c; color: white; }
+        
+        /* Модальне вікно */
+        #editor { display:none; position: fixed; top:50%; left:50%; transform:translate(-50%, -50%); background: white; padding: 30px; border-radius: 15px; box-shadow: 0 0 50px rgba(0,0,0,0.3); z-index: 1000; width: 90%; max-width: 400px; }
+        input, textarea, select { width: 100%; margin: 10px 0; padding: 12px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>🏛 ПАНЕЛЬ КЕРУВАННЯ ТАБЛО</h1>
+<div class="header">
+    <h1>📺 Мої Слайди</h1>
+    <button class="btn-add" onclick="openEditor()">+ ДОДАТИ СЛАЙД</button>
+</div>
 
-    <div class="dashboard">
-        <div class="tile" onclick="openEditor('карта')">КАРТА</div>
-        <div class="tile" onclick="openEditor('новини')">НОВИНИ</div>
-        <div class="tile" onclick="openEditor('день народження')">ДНІ НАРОДЖЕННЯ</div>
-        <div class="tile" onclick="openEditor('хвилина мовчання')">ХВИЛИНА МОВЧАННЯ</div>
-        <div class="tile" style="background:#7f8c8d" onclick="alert('У розробці...')">ДОДАТИ ЩЕ</div>
-    </div>
+<div id="slideGrid" class="grid"></div>
 
-    <div id="editor" class="editor-box">
-        <h3 id="editTitle">Новий слайд</h3>
-        <input type="hidden" id="slideType">
-        <textarea id="slideBody" rows="4" placeholder="Текст або посилання..."></textarea>
-        <input id="slideBg" placeholder="Посилання на картинку фону (необов'язково)">
-        <button onclick="saveSlide()">ЗБЕРЕГТИ НА ТАБЛО</button>
-        <button class="btn-cancel" onclick="closeEditor()">СКАСУВАТИ</button>
-    </div>
-
-    <div id="queueList"><h3>Завантаження черги...</h3></div>
+<div id="editor">
+    <h3 id="editTitle">Новий слайд</h3>
+    <select id="sType">
+        <option value="новини">Новини / Текст</option>
+        <option value="карта">Карта тривог</option>
+        <option value="день народження">День народження</option>
+    </select>
+    <textarea id="sBody" rows="4" placeholder="Текст або посилання..."></textarea>
+    <input id="sBg" placeholder="URL картинки фону">
+    <button style="background:#27ae60; color:white;" onclick="save()">ЗБЕРЕГТИ</button>
+    <button style="background:#95a5a6; color:white; margin-top:5px;" onclick="closeEditor()">СКАСУВАТИ</button>
 </div>
 
 <script>
@@ -106,55 +69,73 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('slides');
+    let currentId = null;
 
-    let currentEditId = null;
-
-    function openEditor(type, body = '', bg = '', id = null) {
-        currentEditId = id;
-        document.getElementById('editor').style.display = 'block';
-        document.getElementById('slideType').value = type;
-        document.getElementById('slideBody').value = body;
-        document.getElementById('slideBg').value = bg;
-        document.getElementById('editTitle').innerText = (id ? 'Редагування: ' : 'Створити: ') + type.toUpperCase();
-        window.scrollTo({ top: document.getElementById('editor').offsetTop - 20, behavior: 'smooth' });
-    }
-
-    function closeEditor() {
-        document.getElementById('editor').style.display = 'none';
-        currentEditId = null;
-    }
-
-    function saveSlide() {
-        const data = {
-            type: document.getElementById('slideType').value,
-            body: document.getElementById('slideBody').value,
-            bg: document.getElementById('slideBg').value
-        };
+    // Завантаження та відображення
+    db.on('value', (snap) => {
+        const grid = document.getElementById('slideGrid');
+        grid.innerHTML = '';
+        const items = [];
+        snap.forEach(c => { items.push({id: c.key, ...c.val()}); });
         
-        if (currentEditId) {
-            db.child(currentEditId).update(data);
-        } else {
-            db.push(data);
+        // Сортуємо за полем order
+        items.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        items.forEach(s => {
+            const card = document.createElement('div');
+            card.className = `card ${s.paused ? 'paused' : ''}`;
+            card.dataset.id = s.id;
+            card.innerHTML = `
+                <div class="type-badge">${s.type} ${s.paused ? '⏸ ПАУЗА' : ''}</div>
+                <div class="preview-box">${s.body.substring(0, 100)}</div>
+                <div class="controls">
+                    <button class="btn-edit" onclick="openEditor('${s.id}', '${s.type}', \`${s.body}\`, '${s.bg}')">⚙️</button>
+                    <button class="btn-pause" onclick="togglePause('${s.id}', ${s.paused})">${s.paused ? '▶️' : '⏸'}</button>
+                    <button class="btn-del" onclick="del('${s.id}')">🗑</button>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    });
+
+    // Drag and Drop логіка
+    new Sortable(document.getElementById('slideGrid'), {
+        animation: 150,
+        onEnd: function() {
+            const cards = document.querySelectorAll('.card');
+            cards.forEach((card, index) => {
+                db.child(card.dataset.id).update({ order: index });
+            });
         }
+    });
+
+    function togglePause(id, currentStatus) {
+        db.child(id).update({ paused: !currentStatus });
+    }
+
+    function openEditor(id=null, type='новини', body='', bg='') {
+        currentId = id;
+        document.getElementById('sType').value = type;
+        document.getElementById('sBody').value = body;
+        document.getElementById('sBg').value = bg;
+        document.getElementById('editor').style.display = 'block';
+    }
+
+    function closeEditor() { document.getElementById('editor').style.display = 'none'; }
+
+    function save() {
+        const data = {
+            type: document.getElementById('sType').value,
+            body: document.getElementById('sBody').value,
+            bg: document.getElementById('sBg').value,
+            paused: false
+        };
+        if(currentId) db.child(currentId).update(data);
+        else db.push({...data, order: 999});
         closeEditor();
     }
 
-    db.on('value', (snap) => {
-        const list = document.getElementById('queueList');
-        list.innerHTML = '<h3>Черга на екрані (можна редагувати):</h3>';
-        snap.forEach(child => {
-            const s = child.val();
-            const id = child.key;
-            list.innerHTML += `
-                <div class="queue-item">
-                    <span><b>${s.type.toUpperCase()}</b>: ${s.body.substring(0,30)}...</span>
-                    <div class="actions">
-                        <button class="edit" onclick="openEditor('${s.type}', '${s.body}', '${s.bg}', '${id}')">Редагувати</button>
-                        <button class="del" onclick="if(confirm('Видалити?')) db.child('${id}').remove()">🗑</button>
-                    </div>
-                </div>`;
-        });
-    });
+    function del(id) { if(confirm('Видалити слайд?')) db.child(id).remove(); }
 </script>
 </body>
 </html>
