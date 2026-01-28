@@ -52,13 +52,72 @@
     let index = 0;
     let timer = null;
 
+   let slides = [];
+    let index = 0;
+    let timer = null;
+
     db.on('value', (snap) => {
         slides = [];
-        snap.forEach(c => { slides.push(c.val()); });
-        index = 0;
-        clearTimeout(timer);
-        show();
+        snap.forEach(c => { 
+            const s = c.val();
+            if (!s.paused) slides.push(s); // Показуємо тільки НЕ на паузі
+        });
+        slides.sort((a, b) => (a.order || 0) - (b.order || 0));
+        if(!timer) show();
     });
+
+    function show() {
+        const now = new Date();
+        const currentTime = now.getHours() + ":" + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+
+        // АВТОМАТИЧНА ХВИЛИНА МОВЧАННЯ (09:00 - 09:01)
+        if (currentTime === "09:00") {
+            displayMourning();
+            setTimeout(show, 30000); // Перевірити знову через 30 сек
+            return;
+        }
+
+        const container = document.getElementById('display');
+        if (slides.length === 0) {
+            container.innerHTML = "<h1>Очікування...</h1>";
+            return;
+        }
+
+        const data = slides[index];
+        container.innerHTML = '';
+        const s = document.createElement('div');
+        s.className = 'slide';
+
+        let duration = 15000;
+        if (data.type === 'карта') {
+            s.innerHTML = `<iframe src="${data.body}"></iframe>`;
+            duration = 60000;
+        } else {
+            if (data.bg) s.style.background = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg}) center/cover`;
+            s.innerHTML = `<div class="text">${data.body}</div>`;
+        }
+
+        container.appendChild(s);
+        index = (index + 1) % slides.length;
+        timer = setTimeout(show, duration);
+    }
+
+    function displayMourning() {
+        const container = document.getElementById('display');
+        container.innerHTML = `
+            <div class="slide" style="background: #000; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                <div style="font-size: 10vw;">🕯️</div>
+                <div style="font-size: 5vw; font-weight: bold; text-transform: uppercase; letter-spacing: 5px;">Загальнонаціональна хвилина мовчання</div>
+                <div style="font-size: 2vw; margin-top: 20px;">Вшановуємо пам'ять загиблих героїв та цивільних...</div>
+            </div>
+        `;
+        clearTimeout(timer);
+    }
+
+    // Годинник
+    setInterval(() => {
+        document.getElementById('clock').innerText = new Date().toLocaleTimeString('uk-UA', {hour:'2-digit', minute:'2-digit'});
+    }, 1000);
 
    function show() {
     const container = document.getElementById('display');
