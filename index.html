@@ -60,31 +60,43 @@
         show();
     });
 
-    function show() {
-        const container = document.getElementById('display');
-        if (slides.length === 0) {
-            container.innerHTML = "<h1 style='margin-top:20vh'>Черга порожня</h1>";
-            return;
-        }
+   function show() {
+    const container = document.getElementById('display');
+    if (slides.length === 0) {
+        container.innerHTML = "<h1 style='margin-top:20vh'>Черга порожня</h1>";
+        return;
+    }
 
-        const data = slides[index];
-        container.innerHTML = '';
-        const s = document.createElement('div');
-        s.className = 'slide';
+    const data = slides[index];
+    container.innerHTML = '';
+    const s = document.createElement('div');
+    s.className = 'slide';
 
-        let duration = 15000; 
+    let duration = 15000; 
 
-        if (data.type === 'карта') {
-            s.innerHTML = `<iframe src="${data.body}"></iframe>`;
-            duration = 45000; 
-        } else {
-            if (data.bg) s.style.background = `linear-gradient(rgba(0,0,0,0.6),rgba(0,0,0,0.6)), url(${data.bg}) center/cover`;
-            s.innerHTML = `<div class="text">${data.body}</div>`;
-        }
+    if (data.type === 'карта') {
+        s.innerHTML = `<iframe src="${data.body}"></iframe>`;
+        duration = 45000; 
+    } 
+    // НОВИЙ БЛОК ДЛЯ ДНІВ НАРОДЖЕННЯ
+    else if (data.type === 'день народження') {
+        s.style.background = "linear-gradient(45deg, #ff00cc, #3333ff)"; // Яскравий фон
+        s.innerHTML = `
+            <div style="font-size: 5vw;">🎉</div>
+            <div class="text" style="color: #fff; text-transform: uppercase;">${data.body}</div>
+            <div style="font-size: 5vw;">🎂</div>
+        `;
+        duration = 20000; // Показуємо трохи довше
+    } 
+    else {
+        if (data.bg) s.style.background = `linear-gradient(rgba(0,0,0,0.6),rgba(0,0,0,0.6)), url(${data.bg}) center/cover`;
+        s.innerHTML = `<div class="text">${data.body}</div>`;
+    }
 
-        container.appendChild(s);
-        index = (index + 1) % slides.length;
-        timer = setTimeout(show, duration);
+    container.appendChild(s);
+    index = (index + 1) % slides.length;
+    timer = setTimeout(show, duration);
+}
     }
 
     setInterval(() => {
