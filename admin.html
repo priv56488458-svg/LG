@@ -2,91 +2,73 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Пульт керування табло</title>
+    <title>Адмін-панель Табло</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f4f7f9; margin: 0; padding: 30px; color: #333; }
-        h2 { text-align: center; color: #2c3e50; }
-        
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f9; margin: 0; padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 30px; }
         .grid { 
             display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); 
-            gap: 25px; 
-            margin-top: 30px;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+            gap: 20px; 
+            min-height: 200px;
         }
-
         .card { 
-            background: white; border-radius: 15px; padding: 20px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+            background: white; border-radius: 12px; padding: 15px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
             display: flex; flex-direction: column; 
-            border-top: 8px solid #3498db; 
-            cursor: grab; transition: 0.3s;
-            height: 280px; position: relative;
+            border-top: 6px solid #3498db; 
+            cursor: grab; height: 260px;
         }
-        .card:active { cursor: grabbing; transform: scale(1.02); }
-        .card.type-Герой { border-top-color: #f1c40f; background: #fffef5; }
+        .card.type-Герой { border-top-color: #f1c40f; }
         .card.type-карта { border-top-color: #e67e22; }
-
-        .type-badge { font-size: 0.7rem; font-weight: bold; text-transform: uppercase; color: #95a5a6; margin-bottom: 10px; }
-        
+        .type-label { font-size: 0.7rem; font-weight: bold; color: #95a5a6; margin-bottom: 8px; text-transform: uppercase; }
         .preview { 
-            flex-grow: 1; background: #f9f9f9; border-radius: 8px; 
-            padding: 15px; font-size: 0.9rem; overflow-y: auto;
-            border: 1px solid #eee; line-height: 1.4; color: #555;
-            white-space: pre-wrap;
+            flex-grow: 1; background: #f9f9f9; border-radius: 6px; 
+            padding: 10px; font-size: 0.85rem; overflow-y: auto;
+            border: 1px solid #eee; white-space: pre-wrap;
         }
-
-        .btns { display: flex; gap: 10px; margin-top: 15px; }
-        button { flex: 1; padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; color: white; }
-        .btn-edit { background: #3498db; }
-        .btn-del { background: #e74c3c; }
-        .btn-add { background: #27ae60; padding: 15px 40px; display: block; margin: 0 auto; font-size: 1.1rem; box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3); }
-
+        .btns { display: flex; gap: 8px; margin-top: 12px; }
+        button { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; }
+        .btn-add { background: #27ae60; padding: 15px 40px; font-size: 1.1rem; margin-bottom: 20px; }
+        
         /* Модальне вікно */
-        #modal { 
-            display:none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            background: white; padding: 30px; border-radius: 20px; box-shadow: 0 0 50px rgba(0,0,0,0.3); 
-            z-index: 1000; width: 450px;
-        }
-        .overlay { display:none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 999; }
-        input, textarea, select { width: 100%; margin: 10px 0; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
-        label { font-size: 0.85rem; color: #7f8c8d; font-weight: bold; }
+        #modal { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:30px; border-radius:15px; box-shadow:0 0 50px rgba(0,0,0,0.4); z-index:1000; width:400px; }
+        #overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999; }
+        input, textarea, select { width: 100%; margin: 8px 0; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
-    <h2>Управління контентом табло</h2>
-    <button class="btn-add" onclick="openEditor()">+ ДОДАТИ НОВИЙ СЛАЙД</button>
+    <div class="header">
+        <h1>Управління контентом табло</h1>
+        <button class="btn-add" onclick="openEditor()">+ ДОДАТИ НОВИЙ СЛАЙД</button>
+    </div>
 
     <div id="slideGrid" class="grid"></div>
 
-    <div id="overlay" class="overlay" onclick="closeEditor()"></div>
+    <div id="overlay" onclick="closeEditor()"></div>
     <div id="modal">
-        <h3 id="modalTitle">Налаштування слайда</h3>
-        <label>Тип контенту</label>
+        <h3 id="modalTitle">Редагування слайда</h3>
         <select id="sType">
-            <option value="новини">📰 Новини / Текст</option>
-            <option value="Герой">🕯️ Герой (Хвилина мовчання)</option>
-            <option value="карта">🌍 Карта тривог</option>
-            <option value="день народження">🎉 Свято / Оголошення</option>
+            <option value="новини">📰 Новини</option>
+            <option value="Герой">🕯️ Герой (Меморіал)</option>
+            <option value="карта">🌍 Карта</option>
+            <option value="день народження">🎉 Свято</option>
         </select>
-        
-        <label>Основний текст (або URL для карти)</label>
-        <textarea id="sBody" rows="5" placeholder="Введіть текст..."></textarea>
-        
-        <label>Посилання на фото/фон (URL)</label>
-        <input id="sBg" placeholder="https://example.com/image.jpg">
-        
+        <textarea id="sBody" rows="5" placeholder="Текст слайда..."></textarea>
+        <input id="sBg" placeholder="URL фонового фото">
         <input type="hidden" id="sId">
         <div class="btns">
-            <button style="background:#27ae60;" onclick="save()">ЗБЕРЕГТИ</button>
-            <button style="background:#95a5a6;" onclick="closeEditor()">СКАСУВАТИ</button>
+            <button style="background:#27ae60" onclick="save()">ЗБЕРЕГТИ</button>
+            <button style="background:#95a5a6" onclick="closeEditor()">СКАСУВАТИ</button>
         </div>
     </div>
 
 <script>
+    // Твій Firebase Config
     const firebaseConfig = {
         apiKey: "AIzaSyDI5emOGELK-Ac4lCn_7nIoT-okhEQgVfY",
         authDomain: "myboard-42e97.firebaseapp.com",
@@ -99,34 +81,45 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('slides');
 
+    // Відображення карток
     db.on('value', (snap) => {
         const grid = document.getElementById('slideGrid');
         grid.innerHTML = '';
         const items = [];
-        snap.forEach(c => items.push({id: c.key, ...c.val()}));
+        
+        snap.forEach(child => {
+            items.push({ id: child.key, ...child.val() });
+        });
+
+        // Сортування за порядком
         items.sort((a, b) => (a.order || 0) - (b.order || 0));
 
         items.forEach(s => {
             const card = document.createElement('div');
-            card.className = `card type-${s.type}`;
+            card.className = `card type-${s.type || 'новини'}`;
             card.dataset.id = s.id;
+            
+            // Захист від порожнього тексту
+            const displayText = s.body ? s.body : "(Порожній слайд - натисніть на шестерню)";
+
             card.innerHTML = `
-                <div class="type-badge">${s.type}</div>
-                <div class="preview">${s.body}</div>
+                <div class="type-label">${s.type || 'новини'}</div>
+                <div class="preview">${displayText}</div>
                 <div class="btns">
-                    <button class="btn-edit" onclick="openEditor('${s.id}', '${s.type}', \`${s.body.replace(/`/g, '\\`')}\`, '${s.bg || ''}')">⚙️</button>
-                    <button class="btn-del" onclick="del('${s.id}')">🗑</button>
+                    <button style="background:#3498db" onclick="openEditor('${s.id}', '${s.type || 'новини'}', \`${(s.body || '').replace(/`/g, '\\`')}\`, '${s.bg || ''}')">⚙️</button>
+                    <button style="background:#e74c3c" onclick="del('${s.id}')">🗑</button>
                 </div>
             `;
             grid.appendChild(card);
         });
     });
 
+    // Можливість перетягування
     new Sortable(document.getElementById('slideGrid'), {
         animation: 150,
-        onEnd: function() {
-            document.querySelectorAll('.card').forEach((el, index) => {
-                db.child(el.dataset.id).update({ order: index });
+        onEnd: () => {
+            document.querySelectorAll('.card').forEach((el, i) => {
+                db.child(el.dataset.id).update({ order: i });
             });
         }
     });
@@ -150,11 +143,10 @@
         const data = {
             type: document.getElementById('sType').value,
             body: document.getElementById('sBody').value,
-            bg: document.getElementById('sBg').value,
-            order: id ? null : 999
+            bg: document.getElementById('sBg').value
         };
         if(id) db.child(id).update(data);
-        else db.push(data);
+        else db.push({...data, order: 999});
         closeEditor();
     }
 
