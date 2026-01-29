@@ -2,37 +2,29 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>TV Board - Full System</title>
+    <title>TV Board - Final Fix</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', Roboto, sans-serif; overflow: hidden; height: 100vh; }
+        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; }
         #display { width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; }
-        .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background-size: cover; background-position: center; transition: opacity 1s; }
+        .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background-size: cover; background-position: center; }
         
-        /* Контейнер для тексту привітання */
         .text-wrap { 
-            padding: 40px 80px; width: 90%; box-sizing: border-box; 
-            text-shadow: 0 5px 25px rgba(0,0,0,0.9); font-weight: 800; 
-            line-height: 1.2; white-space: pre-wrap; word-wrap: break-word;
-            background: rgba(0,0,0,0.2); border-radius: 20px;
+            padding: 50px 100px; width: 95%; box-sizing: border-box; 
+            text-shadow: 0 4px 25px rgba(0,0,0,1); font-weight: bold; 
+            line-height: 1.2; white-space: pre-wrap; 
+            background: rgba(0,0,0,0.4); border-radius: 30px;
         }
 
-        #clock { 
-            position: absolute; top: 25px; right: 35px; font-size: 2.8rem; 
-            background: rgba(0,0,0,0.7); padding: 10px 30px; border-radius: 15px; 
-            z-index: 100; border: 2px solid rgba(255,255,255,0.2); font-variant-numeric: tabular-nums; 
-        }
-
+        #clock { position: absolute; top: 25px; right: 35px; font-size: 2.8rem; background: rgba(0,0,0,0.8); padding: 8px 30px; border-radius: 12px; z-index: 100; border: 1px solid #444; }
         .fade { animation: fadeIn 1.5s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        
-        iframe { width: 100vw; height: 100vh; border: none; }
     </style>
 </head>
 <body>
     <div id="clock">00:00:00</div>
-    <div id="display"><h1>Ініціалізація...</h1></div>
+    <div id="display"><h1>Завантаження даних...</h1></div>
     <audio id="mourningAudio"><source src="https://docs.google.com/uc?export=download&id=1yHGjnCUZZVrSAPy2pAs79zoM0ViJoaAe" type="audio/mpeg"></audio>
 
 <script>
@@ -50,168 +42,89 @@
 
     let normalSlides = [], heroSlides = [], currentIndex = 0, mainTimer = null, mourningActive = false;
 
-    // ПРАВИЛЬНЕ ЗЧИТУВАННЯ ВАШОЇ ФОРМУЛИ
     async function getBirthdayFromSheet() {
         const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
         try {
-            const res = await fetch(url + "&cache=" + Date.now());
+            const res = await fetch(url + "&t=" + Date.now());
             const csv = await res.text();
             
             const now = new Date();
-            const d = String(now.getDate()).padStart(2, '0');
-            const m = String(now.getMonth() + 1).padStart(2, '0');
-            const y = now.getFullYear();
-            const searchDate = `${d}.${m}.${y}`; 
+            const searchDate = now.toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}).replace(/\s/g, '');
+            
+            // ПАРСЕР: Обробляємо CSV як єдиний масив, щоб не втратити рядки всередині клітинки
+            if (csv.includes(searchDate)) {
+                // Знаходимо індекс початку нашої дати
+                let startIndex = csv.indexOf(searchDate);
+                // Беремо великий шматок тексту від дати і далі
+                let rawChunk = csv.substring(startIndex);
+                
+                // Знаходимо кінець блоку (наступна дата або кінець файлу)
+                // Оскільки ваша дата формату XX.XX.202X, шукаємо наступний 2026 рік
+                let nextEntry = rawChunk.indexOf('2026', 10); 
+                let finalBlock = nextEntry !== -1 ? rawChunk.substring(0, nextEntry) : rawChunk;
 
-            console.log("Шукаємо рядок з датою:", searchDate);
-
-            // Шукаємо рядок, який містить сьогоднішню дату
-            const rows = csv.split(/\r?\n/);
-            let foundContent = null;
-
-            for (let row of rows) {
-                if (row.includes(searchDate)) {
-                    // Витягуємо все, що в лапках (результат формули)
-                    let match = row.match(/"([^"]*(?:""[^"]*)*)"/);
-                    if (match) {
-                        foundContent = match[1].replace(/""/g, '"'); // Прибираємо подвійні лапки CSV
-                    } else {
-                        // Якщо лапок немає, просто беремо останній стовпчик
-                        let parts = row.split(',');
-                        foundContent = parts[parts.length - 1];
-                    }
-                    break;
-                }
+                // Чистимо текст від технічного сміття
+                let cleanText = finalBlock
+                    .replace(searchDate, '')        // Видаляємо саму дату з тексту
+                    .replace(/"/g, '')              // Видаляємо лапки
+                    .replace(/,,+/g, '\n')          // Замінюємо пусті коми на переноси
+                    .replace(/,/g, ' ')             // Поодинокі коми — на пробіли
+                    .trim();
+                
+                return searchDate + "\n" + cleanText;
             }
-            return foundContent;
-        } catch (e) { 
-            console.error("Помилка завантаження CSV:", e);
-            return null; 
-        }
+            return null;
+        } catch (e) { return null; }
     }
 
     db.on('value', async (snap) => {
-        normalSlides = []; 
-        heroSlides = [];
-        
+        normalSlides = []; heroSlides = [];
         const todayText = await getBirthdayFromSheet();
-        console.log("Текст на сьогодні:", todayText);
 
         snap.forEach(c => {
             const s = c.val();
             const type = (s.type || "").toLowerCase().trim();
-            
             if (type === 'герой') {
                 heroSlides.push(s);
-            } 
-            else if (type === 'день народження' || type === 'свято') {
-                if (todayText) {
-                    normalSlides.push({ ...s, body: todayText });
-                }
-            } 
-            else if (!s.paused) {
+            } else if (type === 'день народження' || type === 'свято') {
+                if (todayText) normalSlides.push({ ...s, body: todayText });
+            } else if (!s.paused) {
                 normalSlides.push(s);
             }
         });
 
         normalSlides.sort((a,b) => (a.order || 0) - (b.order || 0));
-        
-        if (normalSlides.length > 0) {
-            if (!mainTimer && !mourningActive) nextSlide();
-        } else {
-            document.getElementById('display').innerHTML = "<h1 style='color: #555;'>Немає активних слайдів на сьогодні</h1>";
-        }
+        if (normalSlides.length > 0 && !mainTimer && !mourningActive) nextSlide();
+        else if (normalSlides.length === 0) document.getElementById('display').innerHTML = "<h1>Немає подій</h1>";
     });
 
     function nextSlide() {
         if (mourningActive) return;
         clearTimeout(mainTimer);
         const container = document.getElementById('display');
-        
         if (normalSlides.length === 0) return;
         
         const data = normalSlides[currentIndex % normalSlides.length];
         container.innerHTML = '';
-        
         const slideEl = document.createElement('div');
         slideEl.className = 'slide fade';
         
-        // Встановлення фону
-        if (data.bg) {
-            slideEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.4),rgba(0,0,0,0.4)), url(${data.bg})`;
-        } else {
-            slideEl.style.background = "#1a1a1a";
-        }
-
-        // Логіка відображення контенту
-        if (data.type === 'карта') {
-            slideEl.innerHTML = `<iframe src="${data.body}"></iframe>`;
-            mainTimer = setTimeout(nextSlide, 60000); // Карта на 1 хв
-        } else {
-            // Динамічний розмір шрифту залежно від об'єму тексту
-            let fontSize = "3.5vw";
-            if (data.body.length > 200) fontSize = "2.8vw";
-            if (data.body.length > 500) fontSize = "2.2vw";
-
-            slideEl.innerHTML = `<div class="text-wrap" style="font-size: ${fontSize}">${data.body}</div>`;
-            
-            // Час показу залежить від довжини тексту (мінімум 15 сек)
-            let displayTime = Math.max(15000, data.body.length * 50); 
-            mainTimer = setTimeout(nextSlide, displayTime);
-        }
+        if (data.bg) slideEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg})`;
+        
+        // Авто-розмір шрифту
+        let fSize = data.body.length > 400 ? "2.2vw" : "3.2vw";
+        slideEl.innerHTML = `<div class="text-wrap" style="font-size:${fSize}">${data.body}</div>`;
         
         container.appendChild(slideEl);
         currentIndex++;
+        // Час показу: 15 сек або довше для великих текстів
+        let wait = Math.max(15000, data.body.length * 40);
+        mainTimer = setTimeout(nextSlide, wait);
     }
 
-    // ГОДИННИК ТА ХВИЛИНА МОВЧАННЯ
     setInterval(() => {
-        const now = new Date();
-        document.getElementById('clock').innerText = now.toTimeString().split(' ')[0];
-        
-        const currentTime = now.getHours().toString().padStart(2, '0') + ":" + 
-                            now.getMinutes().toString().padStart(2, '0') + ":" + 
-                            now.getSeconds().toString().padStart(2, '0');
-
-        if (currentTime === "08:59:35" && !mourningActive) runMourning();
+        document.getElementById('clock').innerText = new Date().toTimeString().split(' ')[0];
     }, 1000);
-
-    function runMourning() {
-        mourningActive = true; 
-        clearTimeout(mainTimer);
-        const audio = document.getElementById('mourningAudio');
-        audio.play().catch(e => console.log("Audio play failed", e));
-        
-        const display = document.getElementById('display');
-        const duration = 169000; // ~2:49 хв
-        
-        if (heroSlides.length === 0) {
-            display.innerHTML = "<div class='slide' style='background:#000'><h1>Хвилина мовчання...<br>Герої не вмирають!</h1></div>";
-            setTimeout(() => { mourningActive = false; nextSlide(); }, duration);
-            return;
-        }
-
-        const heroTime = duration / heroSlides.length;
-        let hIdx = 0;
-
-        function showHero() {
-            if (hIdx < heroSlides.length) {
-                const h = heroSlides[hIdx];
-                display.innerHTML = `
-                    <div class="slide fade" style="background-image: url(${h.bg}); justify-content: flex-end;">
-                        <div style="background: rgba(0,0,0,0.8); width: 100%; padding: 40px; border-top: 5px solid #f1c40f;">
-                            <div class="text-wrap" style="background:none; text-shadow:none;">${h.body}</div>
-                        </div>
-                    </div>`;
-                hIdx++; 
-                setTimeout(showHero, heroTime);
-            } else { 
-                mourningActive = false; 
-                nextSlide(); 
-            }
-        }
-        showHero();
-    }
 </script>
 </body>
 </html>
