@@ -2,29 +2,29 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>TV Board - Absolute Fix</title>
+    <title>TV Board - Stable System</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; height: 100vh; }
+        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; }
         #display { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-        .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background-size: cover; background-position: center; }
+        .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
         
         .text-wrap { 
-            padding: 40px 60px; width: 92%; box-sizing: border-box; 
+            padding: 40px 60px; width: 90%; 
             text-shadow: 0 5px 35px rgba(0,0,0,1); font-weight: 800; 
-            line-height: 1.35; white-space: pre-wrap; 
-            background: rgba(0,0,0,0.5); border-radius: 40px;
+            line-height: 1.4; white-space: pre-line; /* Важливо для правильних переносів */
+            background: rgba(0,0,0,0.4); border-radius: 40px;
         }
 
-        #clock { position: absolute; top: 25px; right: 35px; font-size: 3rem; background: rgba(0,0,0,0.85); padding: 10px 40px; border-radius: 15px; z-index: 100; border: 2px solid #555; }
-        .fade { animation: fadeIn 1.2s ease-in-out; }
+        #clock { position: absolute; top: 25px; right: 35px; font-size: 3rem; background: rgba(0,0,0,0.8); padding: 10px 40px; border-radius: 15px; border: 2px solid #555; }
+        .fade { animation: fadeIn 1s ease-in; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
     <div id="clock">00:00:00</div>
-    <div id="display"><h1>Синхронізація...</h1></div>
+    <div id="display"><h1>Завантаження...</h1></div>
     <audio id="mourningAudio"><source src="https://docs.google.com/uc?export=download&id=1yHGjnCUZZVrSAPy2pAs79zoM0ViJoaAe" type="audio/mpeg"></audio>
 
 <script>
@@ -40,90 +40,71 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('slides');
 
-    let normalSlides = [], heroSlides = [], currentIndex = 0, mainTimer = null, mourningActive = false;
-
     async function getBirthdayFromSheet() {
         const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
         try {
             const res = await fetch(url + "&t=" + Date.now());
-            const csvText = await res.text();
+            const csv = await res.text();
+            const today = new Date().toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}).replace(/\s/g, '');
             
-            const now = new Date();
-            const today = now.toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}).replace(/\s/g, '');
-            
-            // Шукаємо рядок за датою
-            const rows = csvText.split(/\r?\n/);
-            for (let row of rows) {
-                if (row.includes(today)) {
-                    // Витягуємо все, що всередині лапок (результат вашої формули)
-                    let match = row.match(/"([^"]*(?:""[^"]*)*)"/);
-                    let content = match ? match[1] : row;
+            const lines = csv.split(/\r?\n/);
+            for (let line of lines) {
+                if (line.includes(today)) {
+                    // Отримуємо чистий текст без зайвих лапок Google
+                    let raw = line.replace(/^"|"$/g, '').replace(/""/g, '"');
+                    
+                    // Відновлюємо структуру вашої формули
+                    let formatted = raw
+                        .replace(today, today + '\n')
+                        .replace(/Вітаємо з/g, '\nВітаємо з\n')
+                        .replace(/Свій день народження відзначають:/g, '\n\nСвій день народження відзначають:\n')
+                        .replace(/Разом до Перемоги!/g, '\n\nРазом до Перемоги!')
+                        // Перенос перед кожним званням
+                        .replace(/(солдат|сержант|лейтенант|майстер|полковник|майор|капітан)/gi, '\n$1')
+                        .replace(/,/g, ' '); // Прибираємо коми-роздільники стовпців
 
-                    // ОЧИЩЕННЯ ТА ФОРМАТУВАННЯ
-                    let clean = content
-                        .replace(/""/g, '"')      // Виправляємо подвійні лапки
-                        .replace(/,,/g, '\n')     // Перетворюємо технічні коми на нові рядки
-                        .trim();
-
-                    // Якщо Google все ж злив текст в один рядок, повертаємо структуру вашої формули примусово
-                    let formatted = clean
-                        .replace("Вітаємо з", "\nВітаємо з\n")
-                        .replace("Свій день народження відзначають:", "\n\nСвій день народження відзначають:\n")
-                        .replace("Разом до Перемоги!", "\n\nРазом до Перемоги!")
-                        // Робимо перенос перед кожним військовим званням
-                        .replace(/(солдат|сержант|лейтенант|майстер|полковник|майор|капітан|матрос)/gi, '\n$1');
-
-                    return formatted;
+                    return formatted.trim();
                 }
             }
             return null;
         } catch (e) { return null; }
     }
 
+    let normalSlides = [], currentIndex = 0, mainTimer = null;
+
     db.on('value', async (snap) => {
-        normalSlides = []; heroSlides = [];
-        const todayContent = await getBirthdayFromSheet();
+        normalSlides = [];
+        const todayText = await getBirthdayFromSheet();
 
         snap.forEach(c => {
             const s = c.val();
-            const type = (s.type || "").toLowerCase().trim();
-            if (type === 'герой') {
-                heroSlides.push(s);
-            } else if (type === 'день народження' || type === 'свято') {
-                if (todayContent) normalSlides.push({ ...s, body: todayContent });
+            if ((s.type || "").toLowerCase() === 'день народження' && todayText) {
+                normalSlides.push({ ...s, body: todayText });
             } else if (!s.paused) {
                 normalSlides.push(s);
             }
         });
 
-        normalSlides.sort((a,b) => (a.order || 0) - (b.order || 0));
-        if (normalSlides.length > 0 && !mainTimer && !mourningActive) nextSlide();
+        if (normalSlides.length > 0 && !mainTimer) nextSlide();
     });
 
     function nextSlide() {
-        if (mourningActive) return;
         clearTimeout(mainTimer);
         const container = document.getElementById('display');
-        if (normalSlides.length === 0) return;
-        
         const data = normalSlides[currentIndex % normalSlides.length];
+        
         container.innerHTML = '';
         const slideEl = document.createElement('div');
         slideEl.className = 'slide fade';
-        
         if (data.bg) slideEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg})`;
+        slideEl.style.backgroundSize = "cover";
         
-        // Розумне масштабування під кількість тексту
-        let fSize = "3.2vw";
-        if (data.body.length > 250) fSize = "2.4vw";
-        if (data.body.length > 500) fSize = "2vw";
-        
+        let fSize = data.body.length > 300 ? "2.2vw" : "3vw";
         slideEl.innerHTML = `<div class="text-wrap" style="font-size:${fSize}">${data.body}</div>`;
         
         container.appendChild(slideEl);
         currentIndex++;
-        let wait = Math.max(15000, data.body.length * 50);
-        mainTimer = setTimeout(nextSlide, wait);
+        mainTimer = setTimeout(nextSlide, 15000);
     }
 
     setInterval(() => {
