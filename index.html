@@ -6,19 +6,19 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; }
+        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; height: 100vh; }
         #display { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
         .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background-size: cover; background-position: center; }
         
         .text-wrap { 
             padding: 40px 60px; width: 92%; box-sizing: border-box; 
             text-shadow: 0 5px 35px rgba(0,0,0,1); font-weight: 800; 
-            line-height: 1.3; white-space: pre-wrap; 
-            background: rgba(0,0,0,0.45); border-radius: 40px;
+            line-height: 1.35; white-space: pre-wrap; 
+            background: rgba(0,0,0,0.5); border-radius: 40px;
         }
 
-        #clock { position: absolute; top: 25px; right: 35px; font-size: 3rem; background: rgba(0,0,0,0.85); padding: 10px 40px; border-radius: 15px; z-index: 100; border: 2px solid #555; font-variant-numeric: tabular-nums; }
-        .fade { animation: fadeIn 1.5s ease-in-out; }
+        #clock { position: absolute; top: 25px; right: 35px; font-size: 3rem; background: rgba(0,0,0,0.85); padding: 10px 40px; border-radius: 15px; z-index: 100; border: 2px solid #555; }
+        .fade { animation: fadeIn 1.2s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
@@ -51,27 +51,30 @@
             const now = new Date();
             const today = now.toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}).replace(/\s/g, '');
             
-            if (csvText.includes(today)) {
-                // Вирізаємо частину тексту після дати
-                let parts = csvText.split(today);
-                let rawData = parts[1].split('2026')[0]; // беремо до наступного запису
+            // Шукаємо рядок за датою
+            const rows = csvText.split(/\r?\n/);
+            for (let row of rows) {
+                if (row.includes(today)) {
+                    // Витягуємо все, що всередині лапок (результат вашої формули)
+                    let match = row.match(/"([^"]*(?:""[^"]*)*)"/);
+                    let content = match ? match[1] : row;
 
-                // ПРАВИЛЬНЕ ВІДНОВЛЕННЯ ТЕКСТУ З ФОРМУЛИ:
-                let clean = rawData
-                    .replace(/^"/, '')        // прибрати лапку на початку
-                    .replace(/"$/, '')        // прибрати лапку в кінці
-                    .replace(/""/g, '"')      // виправити подвійні лапки
-                    .replace(/,,/g, '\n')     // ЗАМІНА: подвійна кома в CSV = ваш перенос рядка
-                    .trim();
+                    // ОЧИЩЕННЯ ТА ФОРМАТУВАННЯ
+                    let clean = content
+                        .replace(/""/g, '"')      // Виправляємо подвійні лапки
+                        .replace(/,,/g, '\n')     // Перетворюємо технічні коми на нові рядки
+                        .trim();
 
-                // Додаткове форматування, якщо CSV злило все в один рядок
-                let final = clean
-                    .replace("Вітаємо з", "\nВітаємо з\n")
-                    .replace("Свій день народження відзначають:", "\n\nСвій день народження відзначають:\n")
-                    .replace("Разом до Перемоги!", "\n\nРазом до Перемоги!")
-                    .replace(/(майстер|солдат|сержант|лейтенант|полковник|майор|капітан)/gi, '\n$1');
+                    // Якщо Google все ж злив текст в один рядок, повертаємо структуру вашої формули примусово
+                    let formatted = clean
+                        .replace("Вітаємо з", "\nВітаємо з\n")
+                        .replace("Свій день народження відзначають:", "\n\nСвій день народження відзначають:\n")
+                        .replace("Разом до Перемоги!", "\n\nРазом до Перемоги!")
+                        // Робимо перенос перед кожним військовим званням
+                        .replace(/(солдат|сержант|лейтенант|майстер|полковник|майор|капітан|матрос)/gi, '\n$1');
 
-                return today + "\n" + final.replace(/\n{3,}/g, '\n\n'); // прибираємо зайві порожні рядки
+                    return formatted;
+                }
             }
             return null;
         } catch (e) { return null; }
@@ -110,7 +113,11 @@
         
         if (data.bg) slideEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg})`;
         
-        let fSize = data.body.length > 300 ? "2.4vw" : "3.2vw";
+        // Розумне масштабування під кількість тексту
+        let fSize = "3.2vw";
+        if (data.body.length > 250) fSize = "2.4vw";
+        if (data.body.length > 500) fSize = "2vw";
+        
         slideEl.innerHTML = `<div class="text-wrap" style="font-size:${fSize}">${data.body}</div>`;
         
         container.appendChild(slideEl);
