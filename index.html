@@ -36,29 +36,40 @@
     let normalSlides = [], heroSlides = [], currentIndex = 0, mainTimer = null, mourningActive = false;
 
     async function getBirthdayFromSheet() {
-        const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
-        try {
-            const res = await fetch(url + "&t=" + Date.now());
-            const csv = await res.text();
-            const rows = csv.split(/\r?\n/);
-            
-            const now = new Date();
-            const today = now.toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}).replace(/\s/g, '');
-            
-            console.log("Сьогоднішня дата для пошуку:", today);
+    const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
+    try {
+        const res = await fetch(url + "&t=" + Date.now());
+        const csv = await res.text();
+        const rows = csv.split(/\r?\n/);
+        
+        const now = new Date();
+        const d = String(now.getDate()).padStart(2, '0');
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const y = now.getFullYear();
+        
+        // Шукаємо просто послідовність цифр "29.01.2026"
+        const searchDate = `${d}.${m}.${y}`; 
+        
+        console.log("Шукаємо в таблиці:", searchDate);
 
-            let foundText = null;
-            rows.forEach((row, index) => {
-                const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-                if (cols.length >= 4) {
-                    let cellD = cols[3].replace(/^"|"$/g, '').replace(/""/g, '"').trim();
-                    // Очищуємо текст клітинки від усього зайвого для перевірки дати
-                    if (cellD.includes(today)) {
-                        console.log("ЗБІГ ЗНАЙДЕНО в рядку " + (index + 1));
-                        foundText = cellD;
-                    }
-                }
-            });
+        let result = null;
+        rows.forEach(row => {
+            // Розбиваємо рядок, ігноруючи лапки
+            if (row.includes(searchDate)) {
+                // Якщо знайшли дату, чистимо весь рядок від технічних лапок Google
+                let cleanRow = row.replace(/"/g, '').replace(/,,/g, ',').trim();
+                let parts = cleanRow.split(',');
+                // Беремо останню частину рядка (там де текст привітання)
+                result = parts[parts.length - 1];
+                console.log("Знайдено текст:", result);
+            }
+        });
+        return result;
+    } catch (e) { 
+        console.error("Помилка завантаження таблиці:", e);
+        return null; 
+    }
+}
             return foundText;
         } catch (e) { 
             console.error("Помилка таблиці:", e);
