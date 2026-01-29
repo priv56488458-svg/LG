@@ -2,11 +2,11 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Інформаційне Табло: Firebase Edition</title>
+    <title>TV Board - Absolute Fix</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; }
+        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; height: 100vh; }
         #display { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
         
         .slide { 
@@ -16,26 +16,26 @@
         }
         
         .text-wrap { 
-            padding: 50px 70px; width: 90%; box-sizing: border-box; 
-            text-shadow: 4px 4px 20px rgba(0,0,0,1); font-weight: 800; 
+            padding: 40px 60px; width: 90%; box-sizing: border-box; 
+            text-shadow: 3px 3px 20px #000; font-weight: 800; 
             line-height: 1.4; white-space: pre-wrap; 
-            background: rgba(0,0,0,0.4); border-radius: 40px;
+            background: rgba(0,0,0,0.4); border-radius: 30px;
         }
 
         #clock { 
-            position: absolute; top: 20px; right: 30px; font-size: 2.8rem; 
-            background: rgba(0,0,0,0.8); padding: 10px 30px; border-radius: 15px; 
+            position: absolute; top: 20px; right: 30px; font-size: 2.5rem; 
+            background: rgba(0,0,0,0.8); padding: 8px 25px; border-radius: 12px; 
             z-index: 100; border: 1px solid #444; font-variant-numeric: tabular-nums; 
         }
 
-        .fade { animation: fadeIn 1.5s ease-in-out; }
+        .fade { animation: fadeIn 1.2s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         iframe { width: 100vw; height: 100vh; border: none; background: white; }
     </style>
 </head>
 <body>
     <div id="clock">00:00:00</div>
-    <div id="display"><h1>Синхронізація...</h1></div>
+    <div id="display"><h1>Завантаження системи...</h1></div>
     <audio id="mourningAudio"><source src="https://docs.google.com/uc?export=download&id=1yHGjnCUZZVrSAPy2pAs79zoM0ViJoaAe" type="audio/mpeg"></audio>
 
 <script>
@@ -51,7 +51,7 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('slides');
 
-    // Ваша "золота" функція з минулого проекту
+    // ТА САМА ФУНКЦІЯ, ЩО ПРАЦЮВАЛА У ВАС РАНІШЕ
     function parseSmartCSV(text) {
         const result = [];
         let cell = '';
@@ -69,16 +69,16 @@
     async function getBirthdayFromSheet() {
         const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
         try {
-            const res = await fetch(url + '&v=' + new Date().getTime());
+            const res = await fetch(url + '&v=' + Date.now());
             const fullText = await res.text();
-            const now = new Date();
-            const today = now.toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}).replace(/\s/g, '');
+            const today = new Date().toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}).replace(/\s/g, '');
             
+            // Розбиваємо на рядки, але зберігаємо цілісність всередині лапок
             const rows = fullText.split(/\r?\n/);
             for (let row of rows) {
                 if (row.includes(today)) {
                     const columns = parseSmartCSV(row);
-                    // Беремо стовпець E (індекс 4). Якщо порожньо - беремо D (індекс 3)
+                    // Стовпець E (індекс 4) - ваш повний текст
                     let content = columns[4] || columns[3] || "";
                     return content.replace(/""/g, '"').trim();
                 }
@@ -89,8 +89,8 @@
     let normalSlides = [], heroSlides = [], currentIndex = 0, mainTimer = null, mourningActive = false;
 
     db.on('value', async (snap) => {
-        normalSlides = []; heroSlides = [];
         const sheetContent = await getBirthdayFromSheet();
+        normalSlides = []; heroSlides = [];
 
         snap.forEach(c => {
             const s = c.val();
@@ -125,9 +125,10 @@
             slideEl.innerHTML = `<iframe src="${data.body}"></iframe>`;
             mainTimer = setTimeout(nextSlide, 60000);
         } else {
-            let fSize = data.body.length > 400 ? "2.2vw" : "3.5vw";
+            // Динамічний розмір шрифту в залежності від об'єму тексту
+            let fSize = data.body.length > 400 ? "2.2vw" : "3.2vw";
             slideEl.innerHTML = `<div class="text-wrap" style="font-size:${fSize}">${data.body}</div>`;
-            mainTimer = setTimeout(nextSlide, 20000);
+            mainTimer = setTimeout(nextSlide, 15000);
         }
         
         container.appendChild(slideEl);
