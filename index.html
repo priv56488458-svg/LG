@@ -2,30 +2,27 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>TV Board - Final Reliable System</title>
+    <title>TV Board - Final Reconstruction</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
         body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; height: 100vh; }
         #display { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-        .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background-size: cover; background-position: center; }
-        
+        .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
         .text-wrap { 
-            padding: 40px 60px; width: 94%; box-sizing: border-box; 
-            text-shadow: 0 5px 35px rgba(0,0,0,1); font-weight: 800; 
+            padding: 40px 60px; width: 92%; box-sizing: border-box; 
+            text-shadow: 0 5px 35px #000; font-weight: 800; 
             line-height: 1.3; white-space: pre-wrap; 
             background: rgba(0,0,0,0.5); border-radius: 40px;
         }
-
-        #clock { position: absolute; top: 25px; right: 35px; font-size: 3.2rem; background: rgba(0,0,0,0.85); padding: 10px 40px; border-radius: 15px; z-index: 100; border: 2px solid #555; }
-        .fade { animation: fadeIn 1.2s ease-in-out; }
+        #clock { position: absolute; top: 25px; right: 35px; font-size: 3rem; background: rgba(0,0,0,0.8); padding: 10px 40px; border-radius: 15px; border: 2px solid #555; }
+        .fade { animation: fadeIn 1s ease-in; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
     <div id="clock">00:00:00</div>
-    <div id="display"><h1>Синхронізація...</h1></div>
-    <audio id="mourningAudio"><source src="https://docs.google.com/uc?export=download&id=1yHGjnCUZZVrSAPy2pAs79zoM0ViJoaAe" type="audio/mpeg"></audio>
+    <div id="display"><h1>Оновлення...</h1></div>
 
 <script>
     const firebaseConfig = {
@@ -47,23 +44,29 @@
             const text = await res.text();
             const today = new Date().toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}).replace(/\s/g, '');
             
-            const rows = text.split(/\r?\n/);
-            for (let row of rows) {
-                if (row.includes(today)) {
-                    // Беремо ВЕСЬ текст рядка після дати, ігноруючи коми CSV
-                    let raw = row.substring(row.indexOf(today) + today.length);
-                    
-                    // Чистимо від технічного сміття Google
-                    let clean = raw.replace(/^"|,|"$|"/g, ' ').replace(/\s{2,}/g, ' ').trim();
+            // Нова логіка: шукаємо рядок з датою і збираємо ВСЕ до наступної дати або кінця
+            const parts = text.split('\n');
+            let found = false;
+            let collectedText = [];
 
-                    // ПРИМУСОВО розставляємо переноси рядків для краси
-                    return today + "\n" + clean
-                        .replace("Вітаємо з", "\nВітаємо з\n")
-                        .replace("Свій день народження відзначають:", "\n\nСвій день народження відзначають:\n")
-                        .replace("Разом до Перемоги!", "\n\nРазом до Перемоги!")
-                        .replace(/(солдат|сержант|лейтенант|майстер-сержант|полковник|майор|капітан)/gi, '\n$1');
+            for (let line of parts) {
+                if (line.includes(today)) {
+                    found = true;
+                    collectedText.push(line.replace(today, '').replace(/^"|,|"/g, '').trim());
+                    continue;
                 }
+                // Якщо ми вже знайшли сьогоднішню дату, але зустріли іншу дату — зупиняємось
+                if (found && /\d{2}\.\d{2}\.\d{4}/.test(line)) break;
+                // Якщо ми в процесі збору — додаємо рядок
+                if (found) collectedText.push(line.replace(/^"|"$/g, '').trim());
             }
+
+            if (collectedText.length > 0) {
+                let fullBody = collectedText.join('\n').replace(/""/g, '"').trim();
+                // Примусово розбиваємо по званнях, якщо вони злилися
+                return today + "\n" + fullBody.replace(/(солдат|сержант|лейтенант|майстер-сержант|полковник|майор|капітан)/gi, '\n$1');
+            }
+            return null;
         } catch (e) { return null; }
     }
 
@@ -72,7 +75,6 @@
     db.on('value', async (snap) => {
         normalSlides = [];
         const todayText = await getBirthdayFromSheet();
-
         snap.forEach(c => {
             const s = c.val();
             if ((s.type === 'день народження' || s.type === 'свято') && todayText) {
@@ -93,9 +95,9 @@
         const slideEl = document.createElement('div');
         slideEl.className = 'slide fade';
         if (data.bg) slideEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg})`;
+        slideEl.style.backgroundSize = "cover";
         
-        // Масштабування тексту
-        let fSize = data.body.length > 350 ? "2.2vw" : "3.1vw";
+        let fSize = data.body.length > 300 ? "2.2vw" : "3.1vw";
         slideEl.innerHTML = `<div class="text-wrap" style="font-size:${fSize}">${data.body}</div>`;
         
         container.appendChild(slideEl);
