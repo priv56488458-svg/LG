@@ -2,27 +2,41 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>TV Board - Final Reconstruction</title>
+    <title>Інформаційне Табло: Firebase Edition</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; height: 100vh; }
-        #display { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-        .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
-        .text-wrap { 
-            padding: 40px 60px; width: 92%; box-sizing: border-box; 
-            text-shadow: 0 5px 35px #000; font-weight: 800; 
-            line-height: 1.3; white-space: pre-wrap; 
-            background: rgba(0,0,0,0.5); border-radius: 40px;
+        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; }
+        #display { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
+        
+        .slide { 
+            width: 100vw; height: 100vh; display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; text-align: center; 
+            background-size: cover; background-position: center; position: absolute;
         }
-        #clock { position: absolute; top: 25px; right: 35px; font-size: 3rem; background: rgba(0,0,0,0.8); padding: 10px 40px; border-radius: 15px; border: 2px solid #555; }
-        .fade { animation: fadeIn 1s ease-in; }
+        
+        .text-wrap { 
+            padding: 50px 70px; width: 90%; box-sizing: border-box; 
+            text-shadow: 4px 4px 20px rgba(0,0,0,1); font-weight: 800; 
+            line-height: 1.4; white-space: pre-wrap; 
+            background: rgba(0,0,0,0.4); border-radius: 40px;
+        }
+
+        #clock { 
+            position: absolute; top: 20px; right: 30px; font-size: 2.8rem; 
+            background: rgba(0,0,0,0.8); padding: 10px 30px; border-radius: 15px; 
+            z-index: 100; border: 1px solid #444; font-variant-numeric: tabular-nums; 
+        }
+
+        .fade { animation: fadeIn 1.5s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        iframe { width: 100vw; height: 100vh; border: none; background: white; }
     </style>
 </head>
 <body>
     <div id="clock">00:00:00</div>
-    <div id="display"><h1>Оновлення...</h1></div>
+    <div id="display"><h1>Синхронізація...</h1></div>
+    <audio id="mourningAudio"><source src="https://docs.google.com/uc?export=download&id=1yHGjnCUZZVrSAPy2pAs79zoM0ViJoaAe" type="audio/mpeg"></audio>
 
 <script>
     const firebaseConfig = {
@@ -37,77 +51,119 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('slides');
 
+    // Ваша "золота" функція з минулого проекту
+    function parseSmartCSV(text) {
+        const result = [];
+        let cell = '';
+        let inQuotes = false;
+        for (let i = 0; i < text.length; i++) {
+            let char = text[i];
+            if (char === '"') inQuotes = !inQuotes;
+            else if (char === ',' && !inQuotes) { result.push(cell); cell = ''; }
+            else { cell += char; }
+        }
+        result.push(cell);
+        return result;
+    }
+
     async function getBirthdayFromSheet() {
         const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
         try {
-            const res = await fetch(url + "&t=" + Date.now());
-            const text = await res.text();
-            const today = new Date().toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}).replace(/\s/g, '');
+            const res = await fetch(url + '&v=' + new Date().getTime());
+            const fullText = await res.text();
+            const now = new Date();
+            const today = now.toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}).replace(/\s/g, '');
             
-            // Нова логіка: шукаємо рядок з датою і збираємо ВСЕ до наступної дати або кінця
-            const parts = text.split('\n');
-            let found = false;
-            let collectedText = [];
-
-            for (let line of parts) {
-                if (line.includes(today)) {
-                    found = true;
-                    collectedText.push(line.replace(today, '').replace(/^"|,|"/g, '').trim());
-                    continue;
+            const rows = fullText.split(/\r?\n/);
+            for (let row of rows) {
+                if (row.includes(today)) {
+                    const columns = parseSmartCSV(row);
+                    // Беремо стовпець E (індекс 4). Якщо порожньо - беремо D (індекс 3)
+                    let content = columns[4] || columns[3] || "";
+                    return content.replace(/""/g, '"').trim();
                 }
-                // Якщо ми вже знайшли сьогоднішню дату, але зустріли іншу дату — зупиняємось
-                if (found && /\d{2}\.\d{2}\.\d{4}/.test(line)) break;
-                // Якщо ми в процесі збору — додаємо рядок
-                if (found) collectedText.push(line.replace(/^"|"$/g, '').trim());
             }
-
-            if (collectedText.length > 0) {
-                let fullBody = collectedText.join('\n').replace(/""/g, '"').trim();
-                // Примусово розбиваємо по званнях, якщо вони злилися
-                return today + "\n" + fullBody.replace(/(солдат|сержант|лейтенант|майстер-сержант|полковник|майор|капітан)/gi, '\n$1');
-            }
-            return null;
         } catch (e) { return null; }
     }
 
-    let normalSlides = [], currentIndex = 0, mainTimer = null;
+    let normalSlides = [], heroSlides = [], currentIndex = 0, mainTimer = null, mourningActive = false;
 
     db.on('value', async (snap) => {
-        normalSlides = [];
-        const todayText = await getBirthdayFromSheet();
+        normalSlides = []; heroSlides = [];
+        const sheetContent = await getBirthdayFromSheet();
+
         snap.forEach(c => {
             const s = c.val();
-            if ((s.type === 'день народження' || s.type === 'свято') && todayText) {
-                normalSlides.push({ ...s, body: todayText });
+            const type = (s.type || "").toLowerCase().trim();
+            if (type === 'герой') {
+                heroSlides.push(s);
+            } else if (type === 'день народження' || type === 'свято') {
+                if (sheetContent) normalSlides.push({ ...s, body: sheetContent });
             } else if (!s.paused) {
                 normalSlides.push(s);
             }
         });
-        if (normalSlides.length > 0 && !mainTimer) nextSlide();
+
+        normalSlides.sort((a,b) => (a.order || 0) - (b.order || 0));
+        if (normalSlides.length > 0 && !mainTimer && !mourningActive) nextSlide();
     });
 
     function nextSlide() {
+        if (mourningActive) return;
         clearTimeout(mainTimer);
         const container = document.getElementById('display');
-        const data = normalSlides[currentIndex % normalSlides.length];
+        if (normalSlides.length === 0) return;
         
+        const data = normalSlides[currentIndex % normalSlides.length];
         container.innerHTML = '';
         const slideEl = document.createElement('div');
         slideEl.className = 'slide fade';
-        if (data.bg) slideEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg})`;
-        slideEl.style.backgroundSize = "cover";
         
-        let fSize = data.body.length > 300 ? "2.2vw" : "3.1vw";
-        slideEl.innerHTML = `<div class="text-wrap" style="font-size:${fSize}">${data.body}</div>`;
+        if (data.bg) slideEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.4),rgba(0,0,0,0.4)), url(${data.bg})`;
+        
+        if (data.type === 'карта') {
+            slideEl.innerHTML = `<iframe src="${data.body}"></iframe>`;
+            mainTimer = setTimeout(nextSlide, 60000);
+        } else {
+            let fSize = data.body.length > 400 ? "2.2vw" : "3.5vw";
+            slideEl.innerHTML = `<div class="text-wrap" style="font-size:${fSize}">${data.body}</div>`;
+            mainTimer = setTimeout(nextSlide, 20000);
+        }
         
         container.appendChild(slideEl);
         currentIndex++;
-        mainTimer = setTimeout(nextSlide, 15000);
     }
 
     setInterval(() => {
-        document.getElementById('clock').innerText = new Date().toTimeString().split(' ')[0];
+        const timeStr = new Date().toTimeString().split(' ')[0];
+        document.getElementById('clock').innerText = timeStr;
+        if (timeStr === "08:59:35" && !mourningActive) runMourning();
     }, 1000);
+
+    function runMourning() {
+        mourningActive = true; 
+        clearTimeout(mainTimer);
+        const audio = document.getElementById('mourningAudio');
+        audio.play().catch(() => {});
+        const display = document.getElementById('display');
+        
+        if (heroSlides.length === 0) {
+            display.innerHTML = "<div class='slide' style='background:#000'><h1>ХВИЛИНА МОВЧАННЯ</h1></div>";
+            setTimeout(() => { mourningActive = false; nextSlide(); }, 169000);
+            return;
+        }
+
+        const heroTime = 169000 / heroSlides.length;
+        let hIdx = 0;
+        function showHero() {
+            if (hIdx < heroSlides.length) {
+                const h = heroSlides[hIdx];
+                display.innerHTML = `<div class="slide fade" style="background-image: url(${h.bg}); justify-content: flex-end;"><div style="background: rgba(0,0,0,0.8); width: 100%; padding: 40px;"><div class="text-wrap" style="background:none; font-size: 2.5vw;">${h.body}</div></div></div>`;
+                hIdx++; setTimeout(showHero, heroTime);
+            } else { mourningActive = false; nextSlide(); }
+        }
+        showHero();
+    }
 </script>
 </body>
 </html>
