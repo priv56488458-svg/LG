@@ -59,18 +59,51 @@
     }
 
     db.on('value', async (snap) => {
-        normalSlides = []; heroSlides = [];
-        const todayGreeting = await getBirthdayFromSheet();
-        snap.forEach(c => {
-            const s = c.val();
-            if (s.type === 'Герой') heroSlides.push(s);
-            else if (s.type === 'день народження') {
-                if (todayGreeting) normalSlides.push({ ...s, body: todayGreeting });
-            } else if (!s.paused) normalSlides.push(s);
-        });
-        normalSlides.sort((a,b) => (a.order || 0) - (b.order || 0));
-        if (!mainTimer && !mourningActive) nextSlide();
+    console.log("Firebase: отримано дані"); // Для перевірки в консолі (F12)
+    normalSlides = [];
+    heroSlides = [];
+    
+    // 1. Отримуємо текст з таблиці (якщо є на сьогодні)
+    const todayGreeting = await getBirthdayFromSheet();
+    if (todayGreeting) console.log("Таблиця: знайдено привітання!");
+
+    // 2. Перебираємо всі слайди з бази
+    snap.forEach(c => {
+        const s = c.val();
+        if (!s) return;
+
+        // Приводимо тип до нижнього регістру, щоб уникнути помилок з великими літерами
+        const type = (s.type || "").toLowerCase().trim();
+
+        if (type === 'герой') {
+            heroSlides.push(s);
+        } 
+        else if (type === 'день народження' || type === 'свято') {
+            // Додаємо слайд ДН, ТІЛЬКИ якщо в таблиці є текст на сьогодні
+            if (todayGreeting) {
+                normalSlides.push({ ...s, body: todayGreeting });
+            } else {
+                console.log("Слайд ДН пропущено: в таблиці немає дати на сьогодні");
+            }
+        } 
+        else if (!s.paused) {
+            // Всі інші типи (новини, карта тощо)
+            normalSlides.push(s);
+        }
     });
+
+    // Сортуємо за порядком
+    normalSlides.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    console.log("Всього слайдів до показу:", normalSlides.length);
+
+    // Запускаємо показ, якщо черга не пуста і показ ще не йде
+    if (normalSlides.length > 0) {
+        if (!mainTimer && !mourningActive) nextSlide();
+    } else {
+        document.getElementById('display').innerHTML = "<h1>Немає активних слайдів. Додайте новини в адмінці.</h1>";
+    }
+});
 
     function nextSlide() {
         if (mourningActive) return;
