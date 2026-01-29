@@ -43,7 +43,6 @@
 
     let normalSlides = [], heroSlides = [], currentIndex = 0, mainTimer = null, mourningActive = false;
 
-    // РОЗУМНИЙ ПЕРЕВІРНИК ТЕКСТУ З ФОРМУЛИ
     async function getGreetingFromSheet() {
         const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
         try {
@@ -59,9 +58,7 @@
                 const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                 if (cols.length >= 4) {
                     let cellD = cols[3].replace(/^"|"$/g, '').replace(/""/g, '"').trim();
-                    // Якщо в результаті вашої формули є сьогоднішня дата
                     if (cellD.includes(today)) {
-                        // Прибираємо дату з тексту, щоб не дублювати
                         result = cellD.replace(today, '').trim();
                     }
                 }
