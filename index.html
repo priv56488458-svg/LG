@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>TV Board - Stable</title>
+    <title>TV Board - Stable System</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
@@ -10,14 +10,14 @@
         #display { width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; }
         .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background-size: cover; background-position: center; }
         .text-wrap { padding: 40px 100px; width: 100%; box-sizing: border-box; text-shadow: 0 4px 20px rgba(0,0,0,1); font-weight: bold; line-height: 1.3; white-space: pre-wrap; font-size: 3vw; }
-        #clock { position: absolute; top: 25px; right: 35px; font-size: 2.5rem; background: rgba(0,0,0,0.8); padding: 8px 30px; border-radius: 12px; z-index: 100; border: 1px solid #444; }
+        #clock { position: absolute; top: 25px; right: 35px; font-size: 2.5rem; background: rgba(0,0,0,0.8); padding: 8px 30px; border-radius: 12px; z-index: 100; border: 1px solid #444; font-variant-numeric: tabular-nums; }
         .fade { animation: fadeIn 1.5s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
     <div id="clock">00:00:00</div>
-    <div id="display"><h1>Завантаження контенту...</h1></div>
+    <div id="display"><h1>Завантаження системи...</h1></div>
     <audio id="mourningAudio"><source src="https://docs.google.com/uc?export=download&id=1yHGjnCUZZVrSAPy2pAs79zoM0ViJoaAe" type="audio/mpeg"></audio>
 
 <script>
@@ -35,71 +35,66 @@
 
     let normalSlides = [], heroSlides = [], currentIndex = 0, mainTimer = null, mourningActive = false;
 
+    // ВИПРАВЛЕНА ФУНКЦІЯ ТАБЛИЦІ
     async function getBirthdayFromSheet() {
-    const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
-    try {
-        const res = await fetch(url + "&t=" + Date.now());
-        const csv = await res.text();
-        const rows = csv.split(/\r?\n/);
-        
-        const now = new Date();
-        const d = String(now.getDate()).padStart(2, '0');
-        const m = String(now.getMonth() + 1).padStart(2, '0');
-        const y = now.getFullYear();
-        
-        // Шукаємо просто послідовність цифр "29.01.2026"
-        const searchDate = `${d}.${m}.${y}`; 
-        
-        console.log("Шукаємо в таблиці:", searchDate);
+        const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
+        try {
+            const res = await fetch(url + "&t=" + Date.now());
+            const csv = await res.text();
+            const rows = csv.split(/\r?\n/);
+            
+            const now = new Date();
+            const d = String(now.getDate()).padStart(2, '0');
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const y = now.getFullYear();
+            const searchDate = `${d}.${m}.${y}`; 
+            
+            console.log("Шукаємо дату:", searchDate);
 
-        let result = null;
-        rows.forEach(row => {
-            // Розбиваємо рядок, ігноруючи лапки
-            if (row.includes(searchDate)) {
-                // Якщо знайшли дату, чистимо весь рядок від технічних лапок Google
-                let cleanRow = row.replace(/"/g, '').replace(/,,/g, ',').trim();
-                let parts = cleanRow.split(',');
-                // Беремо останню частину рядка (там де текст привітання)
-                result = parts[parts.length - 1];
-                console.log("Знайдено текст:", result);
-            }
-        });
-        return result;
-    } catch (e) { 
-        console.error("Помилка завантаження таблиці:", e);
-        return null; 
-    }
-}
-            return foundText;
+            let result = null;
+            rows.forEach(row => {
+                if (row.includes(searchDate)) {
+                    // Чистимо текст від лапок та зайвих ком
+                    let cleanRow = row.replace(/"/g, '').trim();
+                    let parts = cleanRow.split(',');
+                    // Беремо останній сегмент (стовпчик D)
+                    result = parts[parts.length - 1];
+                }
+            });
+            return result;
         } catch (e) { 
-            console.error("Помилка таблиці:", e);
+            console.error("CSV Error:", e);
             return null; 
         }
     }
 
     db.on('value', async (snap) => {
-        normalSlides = []; heroSlides = [];
+        normalSlides = []; 
+        heroSlides = [];
+        
+        // Отримуємо дані з таблиці
         const todayGreeting = await getBirthdayFromSheet();
+        console.log("Результат з таблиці:", todayGreeting);
 
         snap.forEach(c => {
             const s = c.val();
             const type = (s.type || "").toLowerCase().trim();
+            
             if (type === 'герой') {
                 heroSlides.push(s);
-            } else if (type === 'день народження' || type === 'свято') {
+            } 
+            else if (type === 'день народження' || type === 'свято') {
                 if (todayGreeting) {
                     normalSlides.push({ ...s, body: todayGreeting });
                 }
-            } else if (!s.paused) {
+            } 
+            else if (!s.paused) {
                 normalSlides.push(s);
             }
         });
 
-        // Сортування
         normalSlides.sort((a,b) => (a.order || 0) - (b.order || 0));
         
-        console.log("Завантажено слайдів:", normalSlides.length);
-
         if (normalSlides.length > 0) {
             if (!mainTimer && !mourningActive) nextSlide();
         } else {
@@ -113,17 +108,17 @@
         const container = document.getElementById('display');
         
         if (normalSlides.length === 0) {
-            container.innerHTML = "<h1>Оновлення...</h1>";
+            container.innerHTML = "<h1>Оновлення даних...</h1>";
             return;
         }
         
         const data = normalSlides[currentIndex % normalSlides.length];
         container.innerHTML = '';
+        
         const slideEl = document.createElement('div');
         slideEl.className = 'slide fade';
         
         if (data.bg) slideEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg})`;
-        
         slideEl.innerHTML = `<div class="text-wrap">${data.body.replace(/\n/g, '<br>')}</div>`;
         
         container.appendChild(slideEl);
@@ -138,7 +133,8 @@
     }, 1000);
 
     function runMourning() {
-        mourningActive = true; clearTimeout(mainTimer);
+        mourningActive = true; 
+        clearTimeout(mainTimer);
         const audio = document.getElementById('mourningAudio');
         audio.play().catch(() => {});
         const display = document.getElementById('display');
@@ -149,14 +145,19 @@
             setTimeout(() => { mourningActive = false; nextSlide(); }, duration);
             return;
         }
+
         const heroTime = duration / heroSlides.length;
         let hIdx = 0;
         function showHero() {
             if (hIdx < heroSlides.length) {
                 const h = heroSlides[hIdx];
                 display.innerHTML = `<div class="slide fade" style="background-image: url(${h.bg}); justify-content: flex-end;"><div class="text-wrap" style="background:rgba(0,0,0,0.7)">${h.body.replace(/\n/g, '<br>')}</div></div>`;
-                hIdx++; setTimeout(showHero, heroTime);
-            } else { mourningActive = false; nextSlide(); }
+                hIdx++; 
+                setTimeout(showHero, heroTime);
+            } else { 
+                mourningActive = false; 
+                nextSlide(); 
+            }
         }
         showHero();
     }
