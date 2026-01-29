@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>TV Board - Stable Final</title>
+    <title>TV Board - Final Reliable System</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
@@ -11,21 +11,20 @@
         .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background-size: cover; background-position: center; }
         
         .text-wrap { 
-            padding: 45px 65px; width: 92%; box-sizing: border-box; 
+            padding: 40px 60px; width: 94%; box-sizing: border-box; 
             text-shadow: 0 5px 35px rgba(0,0,0,1); font-weight: 800; 
-            line-height: 1.4; white-space: pre-wrap; 
-            background: rgba(0,0,0,0.55); border-radius: 40px;
+            line-height: 1.3; white-space: pre-wrap; 
+            background: rgba(0,0,0,0.5); border-radius: 40px;
         }
 
-        #clock { position: absolute; top: 25px; right: 35px; font-size: 3.2rem; background: rgba(0,0,0,0.85); padding: 10px 40px; border-radius: 15px; z-index: 100; border: 2px solid #444; font-variant-numeric: tabular-nums; }
+        #clock { position: absolute; top: 25px; right: 35px; font-size: 3.2rem; background: rgba(0,0,0,0.85); padding: 10px 40px; border-radius: 15px; z-index: 100; border: 2px solid #555; }
         .fade { animation: fadeIn 1.2s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
-        iframe { width: 100vw; height: 100vh; border: none; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
     <div id="clock">00:00:00</div>
-    <div id="display"><h1>Завантаження...</h1></div>
+    <div id="display"><h1>Синхронізація...</h1></div>
     <audio id="mourningAudio"><source src="https://docs.google.com/uc?export=download&id=1yHGjnCUZZVrSAPy2pAs79zoM0ViJoaAe" type="audio/mpeg"></audio>
 
 <script>
@@ -41,64 +40,51 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('slides');
 
-    let normalSlides = [], heroSlides = [], currentIndex = 0, mainTimer = null, mourningActive = false;
-
     async function getBirthdayFromSheet() {
         const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
         try {
             const res = await fetch(url + "&t=" + Date.now());
-            const csvText = await res.text();
+            const text = await res.text();
             const today = new Date().toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}).replace(/\s/g, '');
             
-            const rows = csvText.split(/\r?\n/);
+            const rows = text.split(/\r?\n/);
             for (let row of rows) {
                 if (row.includes(today)) {
-                    // Беремо весь рядок після дати
-                    let rawContent = row.split(today)[1] || row;
+                    // Беремо ВЕСЬ текст рядка після дати, ігноруючи коми CSV
+                    let raw = row.substring(row.indexOf(today) + today.length);
                     
-                    // Глибока чистка тексту
-                    let clean = rawContent
-                        .replace(/^"/, '').replace(/"$/, '') // Прибрати лапки на початку й в кінці
-                        .replace(/""/g, '"')                 // Виправити внутрішні подвійні лапки
-                        .replace(/,,/g, '\n')                // Кома-кома -> новий рядок
-                        .trim();
+                    // Чистимо від технічного сміття Google
+                    let clean = raw.replace(/^"|,|"$|"/g, ' ').replace(/\s{2,}/g, ' ').trim();
 
-                    // Форматування для красивого виводу
-                    let final = clean
-                        .replace(/(Вітаємо з)/g, '\n$1\n')
-                        .replace(/(Свій день народження відзначають:)/g, '\n\n$1\n')
-                        .replace(/(Разом до Перемоги!)/g, '\n\n$1')
-                        .replace(/(майстер-сержант|лейтенант|сержант|солдат|полковник|майор|капітан)/gi, '\n$1');
-
-                    return today + "\n" + final.replace(/\n{3,}/g, '\n\n');
+                    // ПРИМУСОВО розставляємо переноси рядків для краси
+                    return today + "\n" + clean
+                        .replace("Вітаємо з", "\nВітаємо з\n")
+                        .replace("Свій день народження відзначають:", "\n\nСвій день народження відзначають:\n")
+                        .replace("Разом до Перемоги!", "\n\nРазом до Перемоги!")
+                        .replace(/(солдат|сержант|лейтенант|майстер-сержант|полковник|майор|капітан)/gi, '\n$1');
                 }
             }
-            return null;
         } catch (e) { return null; }
     }
 
+    let normalSlides = [], currentIndex = 0, mainTimer = null;
+
     db.on('value', async (snap) => {
-        normalSlides = []; heroSlides = [];
+        normalSlides = [];
         const todayText = await getBirthdayFromSheet();
 
         snap.forEach(c => {
             const s = c.val();
-            const type = (s.type || "").toLowerCase().trim();
-            if (type === 'герой') {
-                heroSlides.push(s);
-            } else if ((type === 'день народження' || type === 'свято') && todayText) {
+            if ((s.type === 'день народження' || s.type === 'свято') && todayText) {
                 normalSlides.push({ ...s, body: todayText });
-            } else if (!s.paused && type !== 'герой') {
+            } else if (!s.paused) {
                 normalSlides.push(s);
             }
         });
-
-        normalSlides.sort((a,b) => (a.order || 0) - (b.order || 0));
-        if (normalSlides.length > 0 && !mainTimer && !mourningActive) nextSlide();
+        if (normalSlides.length > 0 && !mainTimer) nextSlide();
     });
 
     function nextSlide() {
-        if (mourningActive) return;
         clearTimeout(mainTimer);
         const container = document.getElementById('display');
         const data = normalSlides[currentIndex % normalSlides.length];
@@ -108,49 +94,18 @@
         slideEl.className = 'slide fade';
         if (data.bg) slideEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg})`;
         
-        if (data.type === 'карта') {
-            slideEl.innerHTML = `<iframe src="${data.body}"></iframe>`;
-            mainTimer = setTimeout(nextSlide, 60000);
-        } else {
-            let fSize = data.body.length > 400 ? "2.2vw" : "3.2vw";
-            slideEl.innerHTML = `<div class="text-wrap" style="font-size:${fSize}">${data.body}</div>`;
-            mainTimer = setTimeout(nextSlide, 15000);
-        }
+        // Масштабування тексту
+        let fSize = data.body.length > 350 ? "2.2vw" : "3.1vw";
+        slideEl.innerHTML = `<div class="text-wrap" style="font-size:${fSize}">${data.body}</div>`;
         
         container.appendChild(slideEl);
         currentIndex++;
+        mainTimer = setTimeout(nextSlide, 15000);
     }
 
     setInterval(() => {
-        const timeStr = new Date().toTimeString().split(' ')[0];
-        document.getElementById('clock').innerText = timeStr;
-        if (timeStr === "08:59:40" && !mourningActive) runMourning();
+        document.getElementById('clock').innerText = new Date().toTimeString().split(' ')[0];
     }, 1000);
-
-    function runMourning() {
-        mourningActive = true; 
-        clearTimeout(mainTimer);
-        const audio = document.getElementById('mourningAudio');
-        audio.play().catch(() => {});
-        const display = document.getElementById('display');
-        
-        if (heroSlides.length === 0) {
-            display.innerHTML = "<div class='slide' style='background:#000'><h1>ХВИЛИНА МОВЧАННЯ</h1></div>";
-            setTimeout(() => { mourningActive = false; nextSlide(); }, 169000);
-            return;
-        }
-
-        const heroTime = 169000 / heroSlides.length;
-        let hIdx = 0;
-        function showHero() {
-            if (hIdx < heroSlides.length) {
-                const h = heroSlides[hIdx];
-                display.innerHTML = `<div class="slide fade" style="background-image: url(${h.bg}); justify-content: flex-end;"><div style="background: rgba(0,0,0,0.8); width: 100%; padding: 40px;"><div class="text-wrap" style="background:none; font-size: 2.5vw;">${h.body}</div></div></div>`;
-                hIdx++; setTimeout(showHero, heroTime);
-            } else { mourningActive = false; nextSlide(); }
-        }
-        showHero();
-    }
 </script>
 </body>
 </html>
