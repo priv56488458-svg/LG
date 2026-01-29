@@ -2,37 +2,19 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Інформаційне табло</title>
+    <title>TV Board - Broadcast</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
         body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; }
         #display { width: 100%; height: 100%; position: relative; }
-        
-        .slide { 
-            width: 100vw; height: 100vh; display: flex; flex-direction: column; 
-            justify-content: center; align-items: center; text-align: center; 
-            background-size: cover; background-position: center; box-sizing: border-box;
-        }
-        
-        /* Текст та колонки */
-        .text-wrap { padding: 50px 100px; width: 100%; box-sizing: border-box; z-index: 10; text-shadow: 0 4px 15px rgba(0,0,0,0.8); }
+        .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background-size: cover; background-position: center; box-sizing: border-box; }
+        .text-wrap { padding: 50px 100px; width: 100%; box-sizing: border-box; z-index: 10; text-shadow: 0 4px 15px rgba(0,0,0,0.9); font-weight: 600; line-height: 1.3; }
         .columns { column-count: 2; column-gap: 80px; text-align: justify; }
-
-        /* Меморіал (Герої) */
-        .hero-overlay { 
-            position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.85); 
-            padding: 40px; border-top: 8px solid #f1c40f; animation: slideUp 1s ease;
-        }
+        .hero-overlay { position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.85); padding: 40px; border-top: 8px solid #f1c40f; animation: slideUp 1s ease; }
         .hero-name { font-size: 3.5vw; font-weight: bold; color: #f1c40f; margin-bottom: 10px; }
-        .hero-story { font-size: 1.8vw; line-height: 1.4; opacity: 0.9; }
-
-        #clock { 
-            position: absolute; top: 25px; right: 35px; font-size: 2.5rem; 
-            background: rgba(0,0,0,0.8); padding: 8px 30px; border-radius: 12px; 
-            z-index: 100; border: 1px solid #444; font-variant-numeric: tabular-nums;
-        }
-        iframe { width: 100vw; height: 100vh; border: none; }
+        #clock { position: absolute; top: 25px; right: 35px; font-size: 2.5rem; background: rgba(0,0,0,0.8); padding: 8px 30px; border-radius: 12px; z-index: 100; border: 1px solid #444; font-variant-numeric: tabular-nums; }
+        iframe { width: 100vw; height: 100vh; border: none; background: white; }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .fade { animation: fadeIn 1.5s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -41,9 +23,7 @@
 <body>
     <div id="clock">00:00:00</div>
     <div id="display"></div>
-    <audio id="mourningAudio">
-        <source src="https://docs.google.com/uc?export=download&id=1yHGjnCUZZVrSAPy2pAs79zoM0ViJoaAe" type="audio/mpeg">
-    </audio>
+    <audio id="mourningAudio"><source src="https://docs.google.com/uc?export=download&id=1yHGjnCUZZVrSAPy2pAs79zoM0ViJoaAe" type="audio/mpeg"></audio>
 
 <script>
     const firebaseConfig = {
@@ -58,72 +38,35 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('slides');
 
-    let normalSlides = [];
-    let heroSlides = [];
-    let currentIndex = 0;
-    let mainTimer = null;
-    let mourningActive = false;
+    let normalSlides = [], heroSlides = [], currentIndex = 0, mainTimer = null, mourningActive = false;
 
-    // ЗАВАНТАЖЕННЯ ТАБЛИЦІ (Стовпець D)
-    // Функція завантаження тексту з конкретної клітинки таблиці
-async function fetchBirthdayText() {
-    const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
-    try {
-        const res = await fetch(url + "&nocache=" + Date.now());
-        const csv = await res.text();
-        const rows = csv.split(/\r?\n/);
-        
-        // Отримуємо сьогоднішню дату (29.01.2026)
-        const today = new Date().toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'});
-        
-        let foundText = "";
-        rows.forEach(row => {
-            const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-            if (cols.length >= 4) {
-                const dateVal = cols[0].replace(/"/g, '').trim();
-                const textVal = cols[3].replace(/"/g, '').trim(); // Беремо текст зі стовпчика D
-                if (dateVal === today) {
-                    foundText = textVal;
+    async function getBirthdayFromSheet() {
+        const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
+        try {
+            const res = await fetch(url + "&t=" + Date.now());
+            const csv = await res.text();
+            const rows = csv.split(/\r?\n/);
+            const today = new Date().toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'});
+            let activeText = null;
+            rows.forEach(row => {
+                const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                if (cols.length >= 4 && cols[0].replace(/"/g, '').trim() === today) {
+                    activeText = cols[3].replace(/"/g, '').trim();
                 }
-            }
-        });
-        return foundText;
-    } catch (e) { return ""; }
-}
-
-db.on('value', async (snap) => {
-    normalSlides = [];
-    heroSlides = [];
-    
-    // Шукаємо текст привітання в таблиці
-    const bdayText = await fetchBirthdayText();
-
-    snap.forEach(c => {
-        const s = c.val();
-        if (s.type === 'Герой') {
-            heroSlides.push(s);
-        } else if (s.type === 'день народження') {
-            // Якщо це слайд дня народження, ПІДСТАВЛЯЄМО ТЕКСТ З ТАБЛИЦІ
-            if (bdayText) {
-                normalSlides.push({ ...s, body: bdayText });
-            }
-        } else {
-            normalSlides.push(s);
-        }
-    });
-    
-    normalSlides.sort((a,b) => (a.order || 0) - (b.order || 0));
-    if (!mainTimer && !mourningActive) nextSlide();
-});
+            });
+            return activeText;
+        } catch (e) { return null; }
+    }
 
     db.on('value', async (snap) => {
-        normalSlides = [];
-        heroSlides = [];
-        await fetchBirthdays();
+        normalSlides = []; heroSlides = [];
+        const todayGreeting = await getBirthdayFromSheet();
         snap.forEach(c => {
             const s = c.val();
             if (s.type === 'Герой') heroSlides.push(s);
-            else normalSlides.push(s);
+            else if (s.type === 'день народження') {
+                if (todayGreeting) normalSlides.push({ ...s, body: todayGreeting });
+            } else if (!s.paused) normalSlides.push(s);
         });
         normalSlides.sort((a,b) => (a.order || 0) - (b.order || 0));
         if (!mainTimer && !mourningActive) nextSlide();
@@ -132,80 +75,57 @@ db.on('value', async (snap) => {
     function nextSlide() {
         if (mourningActive) return;
         const container = document.getElementById('display');
-        if (normalSlides.length === 0) {
-            container.innerHTML = "<h1>Оновлення даних...</h1>";
-            mainTimer = setTimeout(nextSlide, 5000);
-            return;
-        }
-
+        if (normalSlides.length === 0) { container.innerHTML = "<h1>Очікування даних...</h1>"; mainTimer = setTimeout(nextSlide, 5000); return; }
+        
         const data = normalSlides[currentIndex % normalSlides.length];
         container.innerHTML = '';
         const slideEl = document.createElement('div');
         slideEl.className = 'slide fade';
-        
         let time = 15000;
 
-        if (data.type === 'карта') {
+        if (data.type === 'карта' || data.type === 'таблиця') {
             slideEl.innerHTML = `<iframe src="${data.body}"></iframe>`;
-            time = 60000;
+            time = 45000;
         } else {
-            const isLong = data.body.length > 700;
+            const isLong = data.body.length > 600;
             if (data.bg) slideEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg})`;
-            slideEl.innerHTML = `
-                <div class="text-wrap ${isLong ? 'columns' : ''}" style="font-size: ${isLong ? '1.4vw' : '2.8vw'}">
-                    ${data.body.replace(/\n/g, '<br>')}
-                </div>`;
-            if (isLong) time = 40000;
+            slideEl.innerHTML = `<div class="text-wrap ${isLong ? 'columns' : ''}" style="font-size: ${isLong ? '1.5vw' : '2.8vw'}">${data.body.replace(/\n/g, '<br>')}</div>`;
+            if (isLong) time = 35000;
         }
-
         container.appendChild(slideEl);
         currentIndex++;
         mainTimer = setTimeout(nextSlide, time);
     }
 
-    // ГОДИННИК ТА ПЕРЕВІРКА 08:59:35
     setInterval(() => {
-        const now = new Date();
-        const timeStr = now.toTimeString().split(' ')[0];
-        document.getElementById('clock').innerText = timeStr;
-        if (timeStr === "08:59:35" && !mourningActive) runMourning();
+        const t = new Date().toTimeString().split(' ')[0];
+        document.getElementById('clock').innerText = t;
+        if (t === "08:59:35" && !mourningActive) runMourning();
     }, 1000);
 
     function runMourning() {
-        mourningActive = true;
-        clearTimeout(mainTimer);
+        mourningActive = true; clearTimeout(mainTimer);
         const audio = document.getElementById('mourningAudio');
-        audio.play().catch(() => console.log("Взаємодійте з екраном для звуку"));
-
+        audio.play().catch(() => {});
         const display = document.getElementById('display');
-        const duration = 169000; // 2:49
-        
+        const duration = 169000;
         if (heroSlides.length === 0) {
-            display.innerHTML = "<div class='slide'><h1>Загальнонаціональна хвилина мовчання</h1></div>";
+            display.innerHTML = "<div class='slide'><h1>Хвилина мовчання</h1></div>";
             setTimeout(() => { mourningActive = false; nextSlide(); }, duration);
             return;
         }
-
         const heroTime = duration / heroSlides.length;
         let hIdx = 0;
-
         function showHero() {
             if (hIdx < heroSlides.length) {
                 const h = heroSlides[hIdx];
-                const lines = h.body.split('\n');
-                display.innerHTML = `
-                    <div class="slide fade" style="background-image: url(${h.bg}); justify-content: flex-end;">
-                        <div class="hero-overlay">
-                            <div class="hero-name">${lines[0]}</div>
-                            <div class="hero-story">${lines.slice(1).join('<br>')}</div>
-                        </div>
-                    </div>`;
-                hIdx++;
-                setTimeout(showHero, heroTime);
+                display.innerHTML = `<div class="slide fade" style="background-image: url(${h.bg}); justify-content: flex-end;"><div class="hero-overlay"><div class="hero-name">${h.body.split('\n')[0]}</div><div class="hero-story">${h.body.split('\n').slice(1).join('<br>')}</div></div></div>`;
+                hIdx++; setTimeout(showHero, heroTime);
             } else { mourningActive = false; nextSlide(); }
         }
         showHero();
     }
+    document.body.onclick = () => console.log("Audio Enabled");
 </script>
 </body>
 </html>
