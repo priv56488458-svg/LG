@@ -2,73 +2,44 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Адмін-панель Табло</title>
+    <title>Панель керування</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f9; margin: 0; padding: 20px; color: #333; }
-        .header { text-align: center; margin-bottom: 30px; }
-        .grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
-            gap: 20px; 
-            min-height: 200px;
-        }
-        .card { 
-            background: white; border-radius: 12px; padding: 15px; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
-            display: flex; flex-direction: column; 
-            border-top: 6px solid #3498db; 
-            cursor: grab; height: 260px;
-        }
+        body { font-family: system-ui, sans-serif; background: #f0f2f5; padding: 20px; margin: 0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; padding: 20px; }
+        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); cursor: grab; border-top: 6px solid #3498db; height: 250px; display: flex; flex-direction: column; position: relative; }
         .card.type-Герой { border-top-color: #f1c40f; }
-        .card.type-карта { border-top-color: #e67e22; }
-        .type-label { font-size: 0.7rem; font-weight: bold; color: #95a5a6; margin-bottom: 8px; text-transform: uppercase; }
-        .preview { 
-            flex-grow: 1; background: #f9f9f9; border-radius: 6px; 
-            padding: 10px; font-size: 0.85rem; overflow-y: auto;
-            border: 1px solid #eee; white-space: pre-wrap;
-        }
-        .btns { display: flex; gap: 8px; margin-top: 12px; }
-        button { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; }
-        .btn-add { background: #27ae60; padding: 15px 40px; font-size: 1.1rem; margin-bottom: 20px; }
-        
-        /* Модальне вікно */
-        #modal { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:30px; border-radius:15px; box-shadow:0 0 50px rgba(0,0,0,0.4); z-index:1000; width:400px; }
-        #overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999; }
+        .card.type-таблиця { border-top-color: #9b59b6; }
+        .card.type-день\ народження { border-top-color: #e74c3c; }
+        .preview { flex-grow: 1; overflow: hidden; font-size: 0.85rem; background: #f9f9f9; padding: 10px; border-radius: 8px; margin: 10px 0; white-space: pre-wrap; }
+        .btns { display: flex; gap: 10px; }
+        button { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; }
+        #modal { display:none; position: fixed; top:50%; left:50%; transform:translate(-50%, -50%); background: white; padding: 30px; border-radius: 15px; box-shadow: 0 0 50px rgba(0,0,0,0.3); z-index: 1000; width: 400px; }
         input, textarea, select { width: 100%; margin: 8px 0; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
     </style>
 </head>
 <body>
-
-    <div class="header">
-        <h1>Управління контентом табло</h1>
-        <button class="btn-add" onclick="openEditor()">+ ДОДАТИ НОВИЙ СЛАЙД</button>
-    </div>
-
+    <div style="text-align:center"><button onclick="openM()" style="background:#27ae60; width:250px; margin-top:20px">+ ДОДАТИ СЛАЙД</button></div>
     <div id="slideGrid" class="grid"></div>
 
-    <div id="overlay" onclick="closeEditor()"></div>
     <div id="modal">
-        <h3 id="modalTitle">Редагування слайда</h3>
+        <h3>Налаштування слайда</h3>
         <select id="sType">
             <option value="новини">📰 Новини</option>
-            <option value="Герой">🕯️ Герой (Меморіал)</option>
-            <option value="карта">🌍 Карта</option>
-            <option value="день народження">🎉 Свято</option>
+            <option value="Герой">🕯️ Герой</option>
+            <option value="день народження">🎉 День народження</option>
+            <option value="карта">🌍 Карта / URL</option>
         </select>
-        <textarea id="sBody" rows="5" placeholder="Текст слайда..."></textarea>
+        <textarea id="sBody" rows="5" placeholder="Текст..."></textarea>
         <input id="sBg" placeholder="URL фонового фото">
         <input type="hidden" id="sId">
-        <div class="btns">
-            <button style="background:#27ae60" onclick="save()">ЗБЕРЕГТИ</button>
-            <button style="background:#95a5a6" onclick="closeEditor()">СКАСУВАТИ</button>
-        </div>
+        <button onclick="save()" style="background:#27ae60">ЗБЕРЕГТИ</button>
+        <button onclick="document.getElementById('modal').style.display='none'" style="background:#95a5a6; margin-top:5px">СКАСУВАТИ</button>
     </div>
 
 <script>
-    // Твій Firebase Config
     const firebaseConfig = {
         apiKey: "AIzaSyDI5emOGELK-Ac4lCn_7nIoT-okhEQgVfY",
         authDomain: "myboard-42e97.firebaseapp.com",
@@ -81,76 +52,39 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('slides');
 
-    // Відображення карток
     db.on('value', (snap) => {
-        const grid = document.getElementById('slideGrid');
-        grid.innerHTML = '';
-        const items = [];
-        
-        snap.forEach(child => {
-            items.push({ id: child.key, ...child.val() });
-        });
-
-        // Сортування за порядком
-        items.sort((a, b) => (a.order || 0) - (b.order || 0));
-
-        items.forEach(s => {
+        const grid = document.getElementById('slideGrid'); grid.innerHTML = '';
+        const items = []; snap.forEach(c => items.push({id: c.key, ...c.val()}));
+        items.sort((a,b) => (a.order || 0) - (b.order || 0)).forEach(s => {
             const card = document.createElement('div');
-            card.className = `card type-${s.type || 'новини'}`;
-            card.dataset.id = s.id;
-            
-            // Захист від порожнього тексту
-            const displayText = s.body ? s.body : "(Порожній слайд - натисніть на шестерню)";
-
-            card.innerHTML = `
-                <div class="type-label">${s.type || 'новини'}</div>
-                <div class="preview">${displayText}</div>
+            card.className = `card type-${s.type}`; card.dataset.id = s.id;
+            card.innerHTML = `<small>${s.type}</small><div class="preview">${s.body}</div>
                 <div class="btns">
-                    <button style="background:#3498db" onclick="openEditor('${s.id}', '${s.type || 'новини'}', \`${(s.body || '').replace(/`/g, '\\`')}\`, '${s.bg || ''}')">⚙️</button>
-                    <button style="background:#e74c3c" onclick="del('${s.id}')">🗑</button>
-                </div>
-            `;
+                    <button style="background:#3498db" onclick="openM('${s.id}', '${s.type}', \`${s.body}\`, '${s.bg}')">⚙️</button>
+                    <button style="background:#e74c3c" onclick="db.child('${s.id}').remove()">🗑</button>
+                </div>`;
             grid.appendChild(card);
         });
     });
 
-    // Можливість перетягування
     new Sortable(document.getElementById('slideGrid'), {
-        animation: 150,
-        onEnd: () => {
-            document.querySelectorAll('.card').forEach((el, i) => {
-                db.child(el.dataset.id).update({ order: i });
-            });
+        animation: 150, onEnd: () => {
+            document.querySelectorAll('.card').forEach((el, i) => db.child(el.dataset.id).update({order: i}));
         }
     });
 
-    function openEditor(id='', type='новини', body='', bg='') {
-        document.getElementById('sId').value = id;
-        document.getElementById('sType').value = type;
-        document.getElementById('sBody').value = body;
-        document.getElementById('sBg').value = bg;
-        document.getElementById('modal').style.display = 'block';
-        document.getElementById('overlay').style.display = 'block';
-    }
-
-    function closeEditor() {
-        document.getElementById('modal').style.display = 'none';
-        document.getElementById('overlay').style.display = 'none';
+    function openM(id='', t='новини', b='', g='') {
+        document.getElementById('sId').value=id; document.getElementById('sType').value=t;
+        document.getElementById('sBody').value=b; document.getElementById('sBg').value=g;
+        document.getElementById('modal').style.display='block';
     }
 
     function save() {
         const id = document.getElementById('sId').value;
-        const data = {
-            type: document.getElementById('sType').value,
-            body: document.getElementById('sBody').value,
-            bg: document.getElementById('sBg').value
-        };
-        if(id) db.child(id).update(data);
-        else db.push({...data, order: 999});
-        closeEditor();
+        const data = { type: document.getElementById('sType').value, body: document.getElementById('sBody').value, bg: document.getElementById('sBg').value };
+        if(id) db.child(id).update(data); else db.push({...data, order: 999});
+        document.getElementById('modal').style.display='none';
     }
-
-    function del(id) { if(confirm('Видалити цей слайд?')) db.child(id).remove(); }
 </script>
 </body>
 </html>
