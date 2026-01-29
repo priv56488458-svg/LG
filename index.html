@@ -2,39 +2,41 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>TV Board Pro - Memorial Edition</title>
+    <title>TV Board Memorial Pro</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
         body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; }
         #display { width: 100%; height: 100%; }
-        .slide { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        .slide { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; text-align: center; background-size: cover; background-position: center; }
         
-        /* Стиль для героїв */
-        .hero-text { 
-            background: rgba(0,0,0,0.7); 
-            padding: 30px; 
-            border-radius: 15px; 
-            font-size: 2.2vw; 
-            max-width: 80%; 
-            line-height: 1.4;
-            border-left: 8px solid #f1c40f;
+        /* Текст для Героїв - знизу на напівпрозорому фоні */
+        .hero-info { 
+            background: rgba(0, 0, 0, 0.75); 
+            width: 100%; 
+            padding: 40px 20px; 
+            box-sizing: border-box;
+            border-top: 5px solid #f1c40f;
+            animation: slideUp 1s ease-out;
         }
+        .hero-name { font-size: 3.5vw; font-weight: bold; margin-bottom: 10px; color: #f1c40f; }
+        .hero-desc { font-size: 1.8vw; line-height: 1.4; max-width: 80%; margin: 0 auto; }
 
-        #clock { position: absolute; top: 20px; right: 30px; font-size: 2rem; background: rgba(0,0,0,0.8); padding: 5px 20px; border-radius: 10px; z-index: 100; border: 1px solid #444; }
+        #clock { position: absolute; top: 20px; right: 30px; font-size: 2.5rem; background: rgba(0,0,0,0.8); padding: 5px 20px; border-radius: 10px; z-index: 100; border: 1px solid #444; font-variant-numeric: tabular-nums; }
         
-        /* Анімація появи */
-        .fade-in { animation: fadeIn 2s; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .fade { animation: fadeIn 2s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
     <div id="clock">00:00:00</div>
     <div id="display"></div>
-    <audio id="mourningAudio" src="https://drive.google.com/file/d/1yHGjnCUZZVrSAPy2pAs79zoM0ViJoaAe/view?usp=sharing"></audio>
+    <audio id="mourningAudio">
+        <source src="https://docs.google.com/uc?export=download&id=1yHGjnCUZZVrSAPy2pAs79zoM0ViJoaAe" type="audio/mpeg">
+    </audio>
 
 <script>
-    // КОНФІГ FIREBASE (твій залишається без змін)
     const firebaseConfig = {
         apiKey: "AIzaSyDI5emOGELK-Ac4lCn_7nIoT-okhEQgVfY",
         authDomain: "myboard-42e97.firebaseapp.com",
@@ -47,108 +49,100 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database().ref('slides');
 
-    let allSlides = [];
-    let heroSlides = [];
     let normalSlides = [];
+    let heroSlides = [];
     let index = 0;
     let timer = null;
-    let isMourningMode = false;
+    let isMourning = false;
 
     db.on('value', (snap) => {
-        heroSlides = [];
         normalSlides = [];
-        snap.forEach(c => { 
+        heroSlides = [];
+        snap.forEach(c => {
             const s = c.val();
             if (!s.paused) {
-                if (s.type === 'герой') heroSlides.push(s);
+                if (s.type === 'Герой') heroSlides.push(s);
                 else normalSlides.push(s);
             }
         });
-        if(!timer && !isMourningMode) show();
+        normalSlides.sort((a,b) => (a.order || 0) - (b.order || 0));
+        if (!timer && !isMourning) show();
     });
 
     function show() {
-        if (isMourningMode) return;
-        clearTimeout(timer);
+        if (isMourning) return;
         const container = document.getElementById('display');
-        
         if (normalSlides.length === 0) {
-            container.innerHTML = "<h1>Очікування...</h1>";
+            container.innerHTML = "<h1>Очікування слайдів...</h1>";
             timer = setTimeout(show, 5000);
             return;
         }
 
         const data = normalSlides[index % normalSlides.length];
-        renderSlide(data);
+        container.innerHTML = '';
+        const s = document.createElement('div');
+        s.className = 'slide fade';
         
+        if (data.type === 'карта') {
+            s.innerHTML = `<iframe src="${data.body}" style="width:100vw; height:100vh; border:none;"></iframe>`;
+        } else {
+            if (data.bg) s.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.4),rgba(0,0,0,0.4)), url(${data.bg})`;
+            s.innerHTML = `<div style="padding:100px; font-size:3vw; font-weight:600; text-shadow:2px 2px 10px #000;">${data.body}</div>`;
+        }
+        
+        container.appendChild(s);
         index++;
         timer = setTimeout(show, 15000);
     }
 
-    function renderSlide(data) {
-        const container = document.getElementById('display');
-        container.innerHTML = '';
-        const s = document.createElement('div');
-        s.className = 'slide fade-in';
-        
-        if (data.type === 'карта') {
-            s.innerHTML = `<iframe src="${data.body}" style="width:100%; height:100%; border:none;"></iframe>`;
-        } else {
-            if (data.bg) s.style.background = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg}) center/cover`;
-            s.innerHTML = `<div class="text" style="font-size:2.5vw">${data.body}</div>`;
-        }
-        container.appendChild(s);
-    }
-
-    // ГОЛОВНИЙ ТАЙМЕР ПЕРЕВІРКИ ЧАСУ
+    // ТАЙМЕР ПЕРЕВІРКИ
     setInterval(() => {
         const now = new Date();
-        const h = now.getHours();
-        const m = now.getMinutes();
-        const s = now.getSeconds();
-        const timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-        document.getElementById('clock').innerText = timeStr;
+        const t = now.toTimeString().split(' ')[0];
+        document.getElementById('clock').innerText = t;
 
-        // ПЕРЕВІРКА НА 08:59:35
-        if (timeStr === "08:59:35" && !isMourningMode) {
-            startMourning();
+        if (t === "08:59:35" && !isMourning) {
+            startMemorial();
         }
     }, 1000);
 
-    function startMourning() {
-        isMourningMode = true;
+    function startMemorial() {
+        isMourning = true;
         clearTimeout(timer);
         const audio = document.getElementById('mourningAudio');
-        audio.play().catch(e => console.log("Потрібна взаємодія з екраном для звуку"));
+        audio.play().catch(() => console.log("Натисніть на екран для активації звуку!"));
 
-        const totalDuration = 169000; // 2 хв 49 сек в мілісекундах
-        const timePerHero = heroSlides.length > 0 ? totalDuration / heroSlides.length : totalDuration;
+        const durationMs = 169000; // 2:49
+        const display = document.getElementById('display');
+        
+        if (heroSlides.length === 0) {
+            display.innerHTML = "<h1 class='fade'>Загальнонаціональна хвилина мовчання</h1>";
+            setTimeout(() => { isMourning = false; show(); }, durationMs);
+            return;
+        }
 
-        let heroIdx = 0;
+        const timePerHero = durationMs / heroSlides.length;
+        let hIdx = 0;
 
         function nextHero() {
-            if (heroIdx < heroSlides.length) {
-                const data = heroSlides[heroIdx];
-                const container = document.getElementById('display');
-                container.innerHTML = `
-                    <div class="slide fade-in" style="background: url(${data.bg}) center/cover">
-                        <div class="hero-text">${data.body}</div>
+            if (hIdx < heroSlides.length) {
+                const h = heroSlides[hIdx];
+                display.innerHTML = `
+                    <div class="slide" style="background-image: url(${h.bg})">
+                        <div class="hero-info">
+                            <div class="hero-name">${h.body.split('\n')[0]}</div>
+                            <div class="hero-desc">${h.body.split('\n').slice(1).join('<br>')}</div>
+                        </div>
                     </div>
                 `;
-                heroIdx++;
+                hIdx++;
                 setTimeout(nextHero, timePerHero);
             } else {
-                // Кінець хвилини мовчання
-                isMourningMode = false;
+                isMourning = false;
                 show();
             }
         }
-
-        if (heroSlides.length > 0) nextHero();
-        else {
-            document.getElementById('display').innerHTML = "<h1>Хвилина мовчання</h1>";
-            setTimeout(() => { isMourningMode = false; show(); }, totalDuration);
-        }
+        nextHero();
     }
 </script>
 </body>
