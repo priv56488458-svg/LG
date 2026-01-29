@@ -2,29 +2,30 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>TV Board - Stable System</title>
+    <title>TV Board - Absolute Formula Fix</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; }
+        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; height: 100vh; }
         #display { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-        .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background-size: cover; background-position: center; }
         
         .text-wrap { 
-            padding: 40px 60px; width: 90%; 
+            padding: 40px 60px; width: 92%; box-sizing: border-box; 
             text-shadow: 0 5px 35px rgba(0,0,0,1); font-weight: 800; 
-            line-height: 1.4; white-space: pre-line; /* Важливо для правильних переносів */
-            background: rgba(0,0,0,0.4); border-radius: 40px;
+            line-height: 1.35; white-space: pre-wrap; 
+            background: rgba(0,0,0,0.5); border-radius: 40px;
+            word-wrap: break-word;
         }
 
-        #clock { position: absolute; top: 25px; right: 35px; font-size: 3rem; background: rgba(0,0,0,0.8); padding: 10px 40px; border-radius: 15px; border: 2px solid #555; }
-        .fade { animation: fadeIn 1s ease-in; }
+        #clock { position: absolute; top: 25px; right: 35px; font-size: 3rem; background: rgba(0,0,0,0.85); padding: 10px 40px; border-radius: 15px; z-index: 100; border: 2px solid #555; }
+        .fade { animation: fadeIn 1s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
     <div id="clock">00:00:00</div>
-    <div id="display"><h1>Завантаження...</h1></div>
+    <div id="display"><h1>Синхронізація з таблицею...</h1></div>
     <audio id="mourningAudio"><source src="https://docs.google.com/uc?export=download&id=1yHGjnCUZZVrSAPy2pAs79zoM0ViJoaAe" type="audio/mpeg"></audio>
 
 <script>
@@ -44,26 +45,30 @@
         const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
         try {
             const res = await fetch(url + "&t=" + Date.now());
-            const csv = await res.text();
+            const csvText = await res.text();
             const today = new Date().toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}).replace(/\s/g, '');
             
-            const lines = csv.split(/\r?\n/);
-            for (let line of lines) {
-                if (line.includes(today)) {
-                    // Отримуємо чистий текст без зайвих лапок Google
-                    let raw = line.replace(/^"|"$/g, '').replace(/""/g, '"');
+            const rows = csvText.split(/\r?\n/);
+            for (let row of rows) {
+                if (row.includes(today)) {
+                    // Цей код витягує ВЕСЬ вміст клітинки, ігноруючи лапки Google
+                    let fullContent = row.split(today)[1] || row;
                     
-                    // Відновлюємо структуру вашої формули
-                    let formatted = raw
-                        .replace(today, today + '\n')
-                        .replace(/Вітаємо з/g, '\nВітаємо з\n')
-                        .replace(/Свій день народження відзначають:/g, '\n\nСвій день народження відзначають:\n')
-                        .replace(/Разом до Перемоги!/g, '\n\nРазом до Перемоги!')
-                        // Перенос перед кожним званням
-                        .replace(/(солдат|сержант|лейтенант|майстер|полковник|майор|капітан)/gi, '\n$1')
-                        .replace(/,/g, ' '); // Прибираємо коми-роздільники стовпців
+                    // ОЧИЩЕННЯ ТА ВІДНОВЛЕННЯ СТРУКТУРИ ВАШОЇ ФОРМУЛИ
+                    let clean = fullContent
+                        .replace(/^"/, '').replace(/"$/, '') // Прибрати зовнішні лапки
+                        .replace(/""/g, '"')                 // Виправити внутрішні лапки
+                        .replace(/,,/g, '\n')                // Кожна подвійна кома — це новий рядок
+                        .trim();
 
-                    return formatted.trim();
+                    // ПРИМУСОВИЙ РОЗПОДІЛ (якщо CSV все одно склеїло текст)
+                    let formatted = clean
+                        .replace(/(Вітаємо з)/g, '\n$1\n')
+                        .replace(/(Свій день народження відзначають:)/g, '\n\n$1\n')
+                        .replace(/(Разом до Перемоги!)/g, '\n\n$1')
+                        .replace(/(майстер-сержант|лейтенант|сержант|солдат|полковник|майор|капітан)/gi, '\n$1');
+
+                    return today + "\n" + formatted.replace(/\n{3,}/g, '\n\n');
                 }
             }
             return null;
@@ -74,13 +79,14 @@
 
     db.on('value', async (snap) => {
         normalSlides = [];
-        const todayText = await getBirthdayFromSheet();
+        const sheetContent = await getBirthdayFromSheet();
 
         snap.forEach(c => {
             const s = c.val();
-            if ((s.type || "").toLowerCase() === 'день народження' && todayText) {
-                normalSlides.push({ ...s, body: todayText });
-            } else if (!s.paused) {
+            const type = (s.type || "").toLowerCase().trim();
+            if ((type === 'день народження' || type === 'свято') && sheetContent) {
+                normalSlides.push({ ...s, body: sheetContent });
+            } else if (!s.paused && type !== 'герой') {
                 normalSlides.push(s);
             }
         });
@@ -91,15 +97,20 @@
     function nextSlide() {
         clearTimeout(mainTimer);
         const container = document.getElementById('display');
-        const data = normalSlides[currentIndex % normalSlides.length];
+        if (normalSlides.length === 0) return;
         
+        const data = normalSlides[currentIndex % normalSlides.length];
         container.innerHTML = '';
         const slideEl = document.createElement('div');
         slideEl.className = 'slide fade';
-        if (data.bg) slideEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg})`;
-        slideEl.style.backgroundSize = "cover";
         
-        let fSize = data.body.length > 300 ? "2.2vw" : "3vw";
+        if (data.bg) slideEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg})`;
+        
+        // Авто-підбір розміру шрифту під об'єм тексту
+        let fSize = "3.2vw";
+        if (data.body.length > 300) fSize = "2.4vw";
+        if (data.body.length > 600) fSize = "1.8vw";
+        
         slideEl.innerHTML = `<div class="text-wrap" style="font-size:${fSize}">${data.body}</div>`;
         
         container.appendChild(slideEl);
