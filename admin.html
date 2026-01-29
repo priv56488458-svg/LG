@@ -2,38 +2,43 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Панель керування</title>
+    <title>Адмін-панель Табло</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
-        body { font-family: system-ui, sans-serif; background: #f0f2f5; padding: 20px; margin: 0; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; padding: 20px; }
-        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); cursor: grab; border-top: 6px solid #3498db; height: 250px; display: flex; flex-direction: column; position: relative; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f9; padding: 20px; margin: 0; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 20px; }
+        .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); cursor: grab; border-top: 6px solid #3498db; height: 260px; display: flex; flex-direction: column; }
         .card.type-Герой { border-top-color: #f1c40f; }
-        .card.type-таблиця { border-top-color: #9b59b6; }
         .card.type-день\ народження { border-top-color: #e74c3c; }
-        .preview { flex-grow: 1; overflow: hidden; font-size: 0.85rem; background: #f9f9f9; padding: 10px; border-radius: 8px; margin: 10px 0; white-space: pre-wrap; }
+        .preview { flex-grow: 1; overflow: hidden; font-size: 0.85rem; background: #f9f9f9; padding: 10px; border-radius: 8px; margin: 10px 0; color: #555; white-space: pre-wrap; }
         .btns { display: flex; gap: 10px; }
-        button { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; }
+        button { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; transition: 0.2s; }
+        button:hover { opacity: 0.8; }
         #modal { display:none; position: fixed; top:50%; left:50%; transform:translate(-50%, -50%); background: white; padding: 30px; border-radius: 15px; box-shadow: 0 0 50px rgba(0,0,0,0.3); z-index: 1000; width: 400px; }
-        input, textarea, select { width: 100%; margin: 8px 0; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        input, textarea, select { width: 100%; margin: 8px 0; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .add-btn { background: #27ae60; width: 250px; font-size: 1rem; margin: 0 auto; display: block; }
     </style>
 </head>
 <body>
-    <div style="text-align:center"><button onclick="openM()" style="background:#27ae60; width:250px; margin-top:20px">+ ДОДАТИ СЛАЙД</button></div>
-    <div id="slideGrid" class="grid"></div>
+    <div class="container">
+        <h1 style="text-align:center; color: #2c3e50;">Управління табло</h1>
+        <button class="add-btn" onclick="openM()">+ ДОДАТИ НОВИЙ СЛАЙД</button>
+        <div id="slideGrid" class="grid"></div>
+    </div>
 
     <div id="modal">
-        <h3>Налаштування слайда</h3>
+        <h3>Налаштування</h3>
         <select id="sType">
             <option value="новини">📰 Новини</option>
             <option value="Герой">🕯️ Герой</option>
-            <option value="день народження">🎉 День народження</option>
+            <option value="день народження">🎉 День народження (з таблиці)</option>
             <option value="карта">🌍 Карта / URL</option>
         </select>
-        <textarea id="sBody" rows="5" placeholder="Текст..."></textarea>
-        <input id="sBg" placeholder="URL фонового фото">
+        <textarea id="sBody" rows="5" placeholder="Текст (для ДН можна залишити порожнім)"></textarea>
+        <input id="sBg" placeholder="URL фонового зображення">
         <input type="hidden" id="sId">
         <button onclick="save()" style="background:#27ae60">ЗБЕРЕГТИ</button>
         <button onclick="document.getElementById('modal').style.display='none'" style="background:#95a5a6; margin-top:5px">СКАСУВАТИ</button>
@@ -58,10 +63,11 @@
         items.sort((a,b) => (a.order || 0) - (b.order || 0)).forEach(s => {
             const card = document.createElement('div');
             card.className = `card type-${s.type}`; card.dataset.id = s.id;
-            card.innerHTML = `<small>${s.type}</small><div class="preview">${s.body}</div>
+            card.innerHTML = `<small style="color:#999">${s.type.toUpperCase()}</small>
+                <div class="preview">${s.body || '(Текст буде взято з таблиці)'}</div>
                 <div class="btns">
-                    <button style="background:#3498db" onclick="openM('${s.id}', '${s.type}', \`${s.body}\`, '${s.bg}')">⚙️</button>
-                    <button style="background:#e74c3c" onclick="db.child('${s.id}').remove()">🗑</button>
+                    <button style="background:#3498db" onclick="openM('${s.id}', '${s.type}', \`${(s.body || '').replace(/`/g, '\\`')}\`, '${s.bg || ''}')">⚙️</button>
+                    <button style="background:#e74c3c" onclick="if(confirm('Видалити?')) db.child('${s.id}').remove()">🗑</button>
                 </div>`;
             grid.appendChild(card);
         });
