@@ -2,32 +2,29 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>TV Board - Professional Display</title>
+    <title>TV Board - Final Structure</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', Roboto, sans-serif; overflow: hidden; height: 100vh; }
-        #display { width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; }
+        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', Tahoma, sans-serif; overflow: hidden; height: 100vh; }
+        #display { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
         .slide { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background-size: cover; background-position: center; }
         
         .text-wrap { 
-            padding: 50px 80px; width: 92%; box-sizing: border-box; 
-            text-shadow: 0 5px 35px rgba(0,0,0,1); font-weight: 800; 
-            line-height: 1.4; white-space: pre-wrap; 
-            background: rgba(0,0,0,0.35); border-radius: 40px;
-            animation: slideUp 1s ease-out;
+            padding: 40px 60px; width: 92%; box-sizing: border-box; 
+            text-shadow: 0 5px 30px rgba(0,0,0,1); font-weight: 800; 
+            line-height: 1.35; white-space: pre-wrap; 
+            background: rgba(0,0,0,0.4); border-radius: 30px;
         }
 
-        #clock { position: absolute; top: 25px; right: 35px; font-size: 3rem; background: rgba(0,0,0,0.8); padding: 10px 40px; border-radius: 15px; z-index: 100; border: 2px solid #444; font-variant-numeric: tabular-nums; }
-        
-        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-        .fade { animation: fadeIn 1.2s; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        #clock { position: absolute; top: 25px; right: 35px; font-size: 3rem; background: rgba(0,0,0,0.85); padding: 10px 40px; border-radius: 15px; z-index: 100; border: 2px solid #444; font-variant-numeric: tabular-nums; }
+        .fade { animation: fadeIn 1.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
     </style>
 </head>
 <body>
     <div id="clock">00:00:00</div>
-    <div id="display"><h1>Завантаження контенту...</h1></div>
+    <div id="display"><h1>Оновлення...</h1></div>
     <audio id="mourningAudio"><source src="https://docs.google.com/uc?export=download&id=1yHGjnCUZZVrSAPy2pAs79zoM0ViJoaAe" type="audio/mpeg"></audio>
 
 <script>
@@ -49,26 +46,36 @@
         const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
         try {
             const res = await fetch(url + "&t=" + Date.now());
-            const csv = await res.text();
+            const csvText = await res.text();
+            
             const now = new Date();
             const searchDate = now.toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}).replace(/\s/g, '');
             
-            if (csv.includes(searchDate)) {
-                let startIndex = csv.indexOf(searchDate);
-                let rawChunk = csv.substring(startIndex);
+            if (csvText.includes(searchDate)) {
+                // Витягуємо весь блок, що стосується дати
+                let startIndex = csvText.indexOf(searchDate);
+                let rawChunk = csvText.substring(startIndex);
                 let nextEntry = rawChunk.indexOf('2026', 15); 
                 let finalBlock = nextEntry !== -1 ? rawChunk.substring(0, nextEntry) : rawChunk;
 
-                // ІНТЕЛЕКТУАЛЬНЕ ВІДНОВЛЕННЯ СТРУКТУРИ ТЕКСТУ
-                let cleanText = finalBlock
-                    .replace(searchDate, '') // Прибираємо дату з середини
-                    .replace(/"/g, '')       // Прибираємо лапки
-                    .replace(/,,/g, ',')     // Чистимо пусті коми
-                    // Розставляємо переноси перед ключовими блоками
-                    .replace(/(Вітаємо|Свій день|Разом до|майстер|сержант|лейтенант|солдат|полковник|майор|капітан)/g, '\n$1')
-                    .trim();
+                // 1. Очищення від лапок Google та ком на початку/в кінці
+                let clean = finalBlock.replace(/^"|"$/g, '').replace(/""/g, '"').trim();
                 
-                return searchDate + "\n\n" + cleanText;
+                // 2. Видаляємо сміттєві коми, які CSV ставить замість СИМВОЛ(10)
+                clean = clean.replace(/^[,\s]+|[,\s]+$/g, '');
+
+                // 3. ПРИМУСОВЕ ФОРМУВАННЯ СТРУКТУРИ (враховуючи вашу формулу)
+                let formatted = clean
+                    .replace(searchDate, searchDate + '\n')
+                    .replace(/(Вітаємо з)/g, '\n$1\n')
+                    .replace(/(Днем пам'яті)/g, '$1\n')
+                    .replace(/(Свій день народження відзначають:)/g, '\n\n$1\n')
+                    // Перенос перед кожним званням
+                    .replace(/(солдат|сержант|лейтенант|майстер|полковник|майор|капітан|матрос)/gi, '\n$1')
+                    .replace(/(Разом до Перемоги!)/g, '\n\n$1');
+
+                // Прибираємо подвійні порожні рядки, якщо вони виникли
+                return formatted.replace(/\n{3,}/g, '\n\n').trim();
             }
             return null;
         } catch (e) { return null; }
@@ -105,26 +112,51 @@
         const slideEl = document.createElement('div');
         slideEl.className = 'slide fade';
         
-        if (data.bg) slideEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.45),rgba(0,0,0,0.45)), url(${data.bg})`;
-        else slideEl.style.background = '#111';
+        if (data.bg) slideEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)), url(${data.bg})`;
         
-        // Масштабування шрифту під об'єм списку
+        // Підбір розміру шрифту
         let fSize = "3.2vw";
-        if (data.body.length > 250) fSize = "2.6vw";
-        if (data.body.length > 500) fSize = "2.1vw";
+        if (data.body.length > 300) fSize = "2.5vw";
+        if (data.body.length > 600) fSize = "2vw";
         
         slideEl.innerHTML = `<div class="text-wrap" style="font-size:${fSize}">${data.body}</div>`;
         
         container.appendChild(slideEl);
         currentIndex++;
         
-        let wait = Math.max(15000, data.body.length * 55); 
+        let wait = Math.max(15000, data.body.length * 50);
         mainTimer = setTimeout(nextSlide, wait);
     }
 
     setInterval(() => {
-        document.getElementById('clock').innerText = new Date().toTimeString().split(' ')[0];
+        const t = new Date().toTimeString().split(' ')[0];
+        document.getElementById('clock').innerText = t;
+        if (t === "08:59:35") runMourning();
     }, 1000);
+
+    function runMourning() {
+        mourningActive = true; clearTimeout(mainTimer);
+        document.getElementById('mourningAudio').play().catch(() => {});
+        const display = document.getElementById('display');
+        const duration = 169000;
+        
+        if (heroSlides.length === 0) {
+            display.innerHTML = "<div class='slide'><h1>Хвилина мовчання</h1></div>";
+            setTimeout(() => { mourningActive = false; nextSlide(); }, duration);
+            return;
+        }
+
+        const heroTime = duration / heroSlides.length;
+        let hIdx = 0;
+        function showHero() {
+            if (hIdx < heroSlides.length) {
+                const h = heroSlides[hIdx];
+                display.innerHTML = `<div class="slide fade" style="background-image: url(${h.bg}); justify-content: flex-end;"><div class="text-wrap" style="background:rgba(0,0,0,0.8); font-size: 2.2vw;">${h.body}</div></div>`;
+                hIdx++; setTimeout(showHero, heroTime);
+            } else { mourningActive = false; nextSlide(); }
+        }
+        showHero();
+    }
 </script>
 </body>
 </html>
