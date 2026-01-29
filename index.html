@@ -65,30 +65,56 @@
     let mourningActive = false;
 
     // ЗАВАНТАЖЕННЯ ТАБЛИЦІ (Стовпець D)
-    async function fetchBirthdays() {
-        const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
-        try {
-            const res = await fetch(url);
-            const csv = await res.text();
-            const rows = csv.split(/\r?\n/);
-            const today = new Date().toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'});
-
-            rows.forEach(row => {
-                const parts = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-                if (parts.length >= 4) {
-                    const dateCell = parts[0].replace(/"/g, '').trim();
-                    const textCell = parts[3].replace(/"/g, '').trim();
-                    if (dateCell === today && textCell) {
-                        normalSlides.push({
-                            type: 'день народження',
-                            body: textCell,
-                            bg: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?q=80&w=2070&auto=format&fit=crop'
-                        });
-                    }
+    // Функція завантаження тексту з конкретної клітинки таблиці
+async function fetchBirthdayText() {
+    const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqeNuXUW-LcH981pbZC5Qj9qLbbXRLtUkxUtPgpwmsP94tiP3kRwRmW8Rp90Og8o24r_iQF0dl8IhG/pub?output=csv";
+    try {
+        const res = await fetch(url + "&nocache=" + Date.now());
+        const csv = await res.text();
+        const rows = csv.split(/\r?\n/);
+        
+        // Отримуємо сьогоднішню дату (29.01.2026)
+        const today = new Date().toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'});
+        
+        let foundText = "";
+        rows.forEach(row => {
+            const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+            if (cols.length >= 4) {
+                const dateVal = cols[0].replace(/"/g, '').trim();
+                const textVal = cols[3].replace(/"/g, '').trim(); // Беремо текст зі стовпчика D
+                if (dateVal === today) {
+                    foundText = textVal;
                 }
-            });
-        } catch (e) { console.error("Sheets error", e); }
-    }
+            }
+        });
+        return foundText;
+    } catch (e) { return ""; }
+}
+
+db.on('value', async (snap) => {
+    normalSlides = [];
+    heroSlides = [];
+    
+    // Шукаємо текст привітання в таблиці
+    const bdayText = await fetchBirthdayText();
+
+    snap.forEach(c => {
+        const s = c.val();
+        if (s.type === 'Герой') {
+            heroSlides.push(s);
+        } else if (s.type === 'день народження') {
+            // Якщо це слайд дня народження, ПІДСТАВЛЯЄМО ТЕКСТ З ТАБЛИЦІ
+            if (bdayText) {
+                normalSlides.push({ ...s, body: bdayText });
+            }
+        } else {
+            normalSlides.push(s);
+        }
+    });
+    
+    normalSlides.sort((a,b) => (a.order || 0) - (b.order || 0));
+    if (!mainTimer && !mourningActive) nextSlide();
+});
 
     db.on('value', async (snap) => {
         normalSlides = [];
